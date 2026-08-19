@@ -9,6 +9,8 @@ your call; the rest I decided as asked.
 |---|---|---|
 | G1 | Backend | **Local Python backend, MongoDB.** FastAPI + Beanie ODM. Built - see [backend/README.md](../backend/README.md) |
 | — | Flutter SDK | **Installed.** 3.47.0 stable at `C:\Users\Banaizade\flutter`, on the user PATH |
+| — | App identifier | **`com.deutschmate.app`** - product-owned, independent of any company. Applied to Android, iOS, macOS, Linux, Windows. Permanent after the first store upload |
+| — | Release signing | **Deferred.** Still the debug keystore. Blocks store upload only; a real upload key does not belong in the repository |
 
 ## Decided here
 
@@ -141,9 +143,10 @@ comes from open-licensed sources (Wiktionary / Kaikki, CC BY-SA) with attributio
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Repo hygiene: `git init`, dead deps, lint fixes, broken test, missing asset dirs | not started |
+| 0 | Repo hygiene: `git init`, dead deps, lint fixes, broken test, missing asset dirs, app identity | **done** (`flutter analyze` clean, 2/2 tests, APK builds) |
 | 1 | Audit + gap report | **done** |
 | — | Flutter SDK install | **done** (3.47.0) |
+| — | Android SDK install | **done** (platform 36, build-tools 36.0.0, NDK 28.2, licences accepted) |
 | — | Backend: auth, progress, versioned content | **done** (41 tests green) |
 | 2 | Theme system: tokens, typography, component themes, dark + light, l10n plumbing | awaiting go-ahead |
 | 3 | Screen-by-screen restyle + string extraction + Lektion path with the spine | after 2 |
