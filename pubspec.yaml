@@ -1,27 +1,24 @@
 name: deutsch_mate
-description: A powerful German learning companion app based on Menschen A1.1.
+description: A German learning companion aligned to the Menschen syllabus (A1.1 to B1.2).
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  # Flutter floor is 3.27: Color.withValues (used instead of the deprecated
+  # withOpacity) does not exist before it.
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.27.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_bloc: ^8.1.3
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  google_fonts: ^6.1.0
   shared_preferences: ^2.2.2
   flutter_tts: ^3.8.3
-  path_provider: ^2.1.6
-  
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
