@@ -147,7 +147,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> {
                               border: Border.all(color: const Color(0xFFFFCC00)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.5),
+                                  color: Colors.black.withValues(alpha: 0.5),
                                   blurRadius: 12,
                                   offset: const Offset(0, 6),
                                 ),

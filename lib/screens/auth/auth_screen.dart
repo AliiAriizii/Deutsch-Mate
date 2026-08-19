@@ -53,11 +53,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
       // ذخیره مجدد به صورت رشته JSON
       await prefs.setString('users_data', jsonEncode(usersList));
-
-      print('✅ کاربر با موفقیت ذخیره شد!');
-      print('📄 کل کاربران ذخیره‌شده: ${prefs.getString('users_data')}');
     } catch (e) {
-      print('❌ خطا در ذخیره‌سازی: $e');
+      // Only the failure type, never the payload: this map holds credentials,
+      // and the previous version printed every stored password to the log.
+      debugPrint('Failed to persist local user record: ${e.runtimeType}');
     }
   }
 

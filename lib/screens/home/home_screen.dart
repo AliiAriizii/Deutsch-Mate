@@ -27,7 +27,7 @@ class HomeScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFCC00).withOpacity(0.2),
+                  color: const Color(0xFFFFCC00).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0xFFFFCC00)),
                 ),
@@ -51,7 +51,7 @@ class HomeScreen extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFFFCC00).withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFFFFCC00).withValues(alpha: 0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
