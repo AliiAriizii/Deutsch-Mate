@@ -13,7 +13,10 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.2
-  flutter_tts: ^3.8.3
+  # 3.x compiles against android-31, while its own transitive
+  # androidx.annotation-experimental:1.4.0 requires compileSdk 34+, so the
+  # Android build cannot be configured at all on 3.x.
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:
