@@ -1,4 +1,4 @@
-package com.example.deutsch_mate
+package com.deutschmate.app
 
 import io.flutter.embedding.android.FlutterActivity
 
