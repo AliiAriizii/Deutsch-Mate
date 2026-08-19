@@ -1,9 +1,8 @@
-// This is a basic Flutter widget test.
+// Smoke test: the app boots and lands on the auth screen.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Replaced the stock counter-app template, which referenced a `MyApp` class
+// that never existed in this project (the app widget is `DeutschMateApp`) and
+// therefore failed to compile.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,20 +10,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:deutsch_mate/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('app boots into the auth screen', (WidgetTester tester) async {
+    await tester.pumpWidget(const DeutschMateApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // The auth screen is the entry point, and it offers both modes.
+    expect(find.byType(TextFormField), findsWidgets);
+    expect(find.byType(ElevatedButton), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('auth screen toggles between sign in and sign up', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const DeutschMateApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Sign-in mode shows email + password only.
+    final signInFields = find.byType(TextFormField).evaluate().length;
+
+    await tester.tap(find.byType(TextButton));
+    await tester.pumpAndSettle();
+
+    // Sign-up mode adds name and phone.
+    final signUpFields = find.byType(TextFormField).evaluate().length;
+    expect(signUpFields, greaterThan(signInFields));
   });
 }
