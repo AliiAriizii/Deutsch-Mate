@@ -13,7 +13,7 @@ your call; the rest I decided as asked.
 | G1 | Backend | **Local Python backend, MongoDB.** FastAPI + Beanie ODM. Built - see [backend/README.md](../backend/README.md) |
 | — | Flutter SDK | **Installed.** 3.47.0 stable at `C:\Users\Banaizade\flutter`, on the user PATH |
 | — | App identifier | **`com.deutschmate.app`** - product-owned, independent of any company. Applied to Android, iOS, macOS, Linux, Windows. Permanent after the first store upload |
-| — | Release signing | **Deferred.** Still the debug keystore. Blocks store upload only; a real upload key does not belong in the repository |
+| — | Release signing | **Done.** PKCS12 upload key outside the repo, R8 enabled, verified against a signed APK. See [SIGNING.md](SIGNING.md) |
 
 ## Decided here
 
@@ -139,8 +139,12 @@ protectable and is what makes the app line up with a classroom course.
 `README.md` at the repo root is not a readme: it is a 69-entry German→Persian
 vocabulary dump with IPA and no stated source. It gets moved to
 `docs/legacy/unsourced_vocab_dump.md`, excluded from shipped content, and stays
-out of the app until you can tell me where it came from. Shipped vocabulary
-comes from open-licensed sources (Wiktionary / Kaikki, CC BY-SA) with attribution.
+out of the app until you can tell me where it came from.
+
+Shipped vocabulary comes from **Wikidata Lexemes (CC0)** for morphology, not
+Wiktionary/Kaikki — those are CC BY-SA, and share-alike on the word database
+of a commercial app is a constraint, not a footnote. Reasoning and the
+coverage-probe plan are in [BLOCKERS.md](BLOCKERS.md#3-vocabulary-licensing--solved-and-it-is-not-wiktionary).
 
 ## Revised phase plan
 
@@ -151,8 +155,9 @@ comes from open-licensed sources (Wiktionary / Kaikki, CC BY-SA) with attributio
 | — | Flutter SDK install | **done** (3.47.0) |
 | — | Android SDK install | **done** (platform 36, build-tools 36.0.0, NDK 28.2, licences accepted) |
 | — | Backend: auth, progress, versioned content | **done** (41 tests green) |
-| 2 | Theme system: tokens, typography, component themes, dark + light, l10n plumbing | awaiting go-ahead |
-| 3 | Screen-by-screen restyle + string extraction + Lektion path with the spine | after 2 |
-| 4 | Flutter auth client against this API: secure storage, silent refresh, onboarding | after 3 |
-| 5 | Content schema + validator, Drift mirror, migrate off `AppData`, reference Lektion | after 4 |
-| 6 | 72-Lektion syllabus map, original authored content, placement test | after 5 |
+| 2 | Theme system: tokens, typography, component themes, dark + light, l10n plumbing | **done** |
+| 3 | Screen-by-screen restyle + Lektion path with the spine + RTL | **done** (ARB string extraction still outstanding) |
+| — | Android release signing + R8 | **done** |
+
+The plan past this point is superseded by the v2 spec. Current phase order,
+blocker resolutions and open decisions live in [BLOCKERS.md](BLOCKERS.md).
