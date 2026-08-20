@@ -34,17 +34,32 @@ abstract final class AppPalette {
   static const darkTextTertiary = Color(0xFF7C889A);
 
   // --------------------------------------------------------------- light ----
+  // The dark ramp expresses elevation by getting *lighter* each step. That
+  // logic cannot simply be mirrored onto white: a card lighter than a white
+  // scaffold is impossible, and a card slightly darker than white reads as
+  // dirty rather than raised. So the light ramp inverts the direction - the
+  // ground is tinted and cards rise to pure white above it.
 
-  static const paper000 = Color(0xFFFFFFFF);
-  static const paper050 = Color(0xFFF7F9FC);
-  static const paper100 = Color(0xFFEEF2F7);
-  static const paper200 = Color(0xFFE3E9F1);
-  static const paperHairline = Color(0xFFD4DCE7);
+  /// Tinted ground, not white. The scaffold is the darkest light surface.
+  static const paperGround = Color(0xFFEDF1F7);
+
+  /// Sunken panels: grammar blocks, filter bars.
+  static const paperSunken = Color(0xFFF4F7FB);
+
+  /// Cards. The brightest surface, so elevation reads as "closer to the light".
+  static const paperRaised = Color(0xFFFFFFFF);
+
+  /// Input fills sit below the card they live on.
+  static const paperInput = Color(0xFFE4EAF3);
+
+  /// Stronger than the dark theme's hairline: on light surfaces a 1px rule has
+  /// to work harder to register at all.
+  static const paperHairline = Color(0xFFC9D3E0);
 
   static const lightTextPrimary = Color(0xFF0B1220);
   static const lightTextSecondary = Color(0xFF47566B);
 
-  /// Same story as darkTextTertiary: #6B7A8F fails AA on paper050.
+  /// Same story as darkTextTertiary: #6B7A8F fails AA on the light surfaces.
   static const lightTextTertiary = Color(0xFF56657A);
 
   // ------------------------------------------------- grammatical gender ----

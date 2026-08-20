@@ -29,6 +29,20 @@ double _ratio(Color fg, Color bg) {
 /// the tinted chip fills are what a user actually sees.
 Color _over(Color fg, Color bg) => Color.alphaBlend(fg, bg);
 
+/// CIE L*, perceptual lightness on a 0-100 scale.
+///
+/// Relative luminance is the right measure for text contrast but the wrong one
+/// for "can I see that this is a different surface": it compresses hard near
+/// black, so the ink ramp - clearly separable on screen - measures as a delta
+/// of 0.005. L* stays perceptually even across the whole range.
+double _lStar(Color c) {
+  final y = _luminance(c);
+  const epsilon = 216 / 24389;
+  const kappa = 24389 / 27;
+  final f = y > epsilon ? math.pow(y, 1 / 3) as double : (kappa * y + 16) / 116;
+  return 116 * f - 16;
+}
+
 void main() {
   // AA is 4.5:1 for body text and 3:1 for large text and UI boundaries.
   const bodyMin = 4.5;
@@ -127,6 +141,43 @@ void main() {
       });
     });
   }
+
+  // Contrast alone did not catch the light theme reading as flat: text was
+  // legible, but a card at #EEF2F7 on a #FFFFFF scaffold was invisible as a
+  // surface. Depth is the elevation system here, so it needs its own check.
+  group('surfaces are separable', () {
+    for (final (name, c) in [
+      ('dark', AppColors.dark),
+      ('light', AppColors.light),
+    ]) {
+      test('$name: a card is visibly raised off the scaffold', () {
+        final delta = (_lStar(c.card) - _lStar(c.scaffold)).abs();
+        expect(
+          delta,
+          greaterThan(3),
+          reason: 'a card the same value as the ground has no elevation',
+        );
+      });
+
+      test('$name: input fill is separable from the card it sits on', () {
+        final delta = (_lStar(c.inputFill) - _lStar(c.card)).abs();
+        expect(delta, greaterThan(2));
+      });
+
+      test('$name: the surface ramp is monotonic', () {
+        // scaffold -> surface -> card must move consistently in one direction,
+        // otherwise "one step up" means different things on different screens.
+        final scaffold = _lStar(c.scaffold);
+        final surface = _lStar(c.surface);
+        final card = _lStar(c.card);
+        expect(
+          (surface - scaffold).sign,
+          (card - surface).sign,
+          reason: 'the ramp reverses direction mid-way',
+        );
+      });
+    }
+  });
 
   test('the three gender colours are distinguishable from each other', () {
     // If two of them read as the same hue, the colour coding teaches nothing.

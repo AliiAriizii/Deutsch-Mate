@@ -28,7 +28,7 @@ abstract final class AppTheme {
       primary: c.accent,
       onPrimary: brightness == Brightness.dark
           ? AppPalette.darkTextPrimary
-          : AppPalette.paper000,
+          : AppPalette.paperRaised,
       primaryContainer: c.accentStrong,
       onPrimaryContainer: AppPalette.darkTextPrimary,
       secondary: c.accentSoft,
@@ -38,7 +38,7 @@ abstract final class AppTheme {
       error: c.error,
       onError: brightness == Brightness.dark
           ? AppPalette.ink900
-          : AppPalette.paper000,
+          : AppPalette.paperRaised,
       surface: c.surface,
       onSurface: c.textPrimary,
       onSurfaceVariant: c.textSecondary,

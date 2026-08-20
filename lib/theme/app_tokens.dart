@@ -153,10 +153,10 @@ class AppColors extends ThemeExtension<AppColors> {
   );
 
   static const light = AppColors(
-    scaffold: AppPalette.paper000,
-    surface: AppPalette.paper050,
-    card: AppPalette.paper100,
-    inputFill: AppPalette.paper200,
+    scaffold: AppPalette.paperGround,
+    surface: AppPalette.paperSunken,
+    card: AppPalette.paperRaised,
+    inputFill: AppPalette.paperInput,
     hairline: AppPalette.paperHairline,
     textPrimary: AppPalette.lightTextPrimary,
     textSecondary: AppPalette.lightTextSecondary,

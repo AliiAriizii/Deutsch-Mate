@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/utils/audio_helper.dart';
+import '../../main.dart' show ThemeScope;
+import '../../theme/theme_controller.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/primitives.dart';
@@ -70,6 +72,10 @@ class ProfileScreen extends StatelessWidget {
           ),
           SizedBox(height: spacing.xl),
 
+          SectionHeader(title: 'ظاهر', eyebrow: 'تم'),
+          const _ThemePicker(),
+          SizedBox(height: spacing.xl),
+
           SectionHeader(title: 'گفتار', eyebrow: 'تلفظ'),
           const _VoiceStatusCard(),
           SizedBox(height: spacing.xl),
@@ -88,6 +94,112 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Theme choice. Dark is the default and the design target; the other two are
+/// available rather than assumed.
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker();
+
+  static const _options = [
+    (mode: ThemeMode.dark, label: 'تیره', icon: Icons.dark_mode_outlined),
+    (mode: ThemeMode.light, label: 'روشن', icon: Icons.light_mode_outlined),
+    (mode: ThemeMode.system, label: 'سیستم', icon: Icons.contrast),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = ThemeScope.maybeOf(context);
+    final current = controller?.mode ?? ThemeController.defaultMode;
+    final colors = context.colors;
+    final spacing = context.spacing;
+
+    return AppCard(
+      padding: EdgeInsets.all(spacing.sm),
+      child: Row(
+        children: [
+          for (final option in _options) ...[
+            if (option != _options.first) SizedBox(width: spacing.xs),
+            Expanded(
+              child: _ThemeOption(
+                label: option.label,
+                icon: option.icon,
+                selected: option.mode == current,
+                // Disabled only if the controller is absent, which happens
+                // just in tests that build the app without async setup.
+                onTap: controller == null
+                    ? null
+                    : () => controller.set(option.mode),
+                accent: colors.accent,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  const _ThemeOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+    required this.accent,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback? onTap;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return AnimatedContainer(
+      duration: context.motion.resolve(context, context.motion.quick),
+      curve: context.motion.curve,
+      decoration: BoxDecoration(
+        color: selected ? accent.withValues(alpha: 0.14) : colors.surface,
+        borderRadius: context.radii.controlBorder,
+        border: Border.all(
+          color: selected ? accent : colors.hairline,
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: context.radii.controlBorder,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: context.radii.controlBorder,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: context.spacing.md),
+            child: Column(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? colors.accentSoft : colors.textTertiary,
+                ),
+                SizedBox(height: context.spacing.xs),
+                Text(
+                  label,
+                  style: context.texts.labelSmall?.copyWith(
+                    color: selected ? colors.accentSoft : colors.textSecondary,
+                    fontWeight: selected ? FontWeight.w600 : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
