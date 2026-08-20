@@ -12,6 +12,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Ships the Material/Cupertino strings and the bidi machinery for fa, so the
+  # Persian UI mirrors instead of rendering RTL text in an LTR layout.
+  flutter_localizations:
+    sdk: flutter
   shared_preferences: ^2.2.2
   # 3.x compiles against android-31, while its own transitive
   # androidx.annotation-experimental:1.4.0 requires compileSdk 34+, so the
@@ -28,3 +32,23 @@ flutter:
   assets:
     - assets/data/
     - assets/audio/
+
+  # Bundled, not fetched. The app is offline-first, so a runtime font download
+  # would mean a first launch with no typography.
+  #
+  # These are variable fonts - upstream publishes no static instances - so
+  # weight and width are selected in the theme via FontVariation rather than by
+  # declaring one file per weight here.
+  fonts:
+    - family: Bricolage
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque.ttf
+    - family: Instrument
+      fonts:
+        - asset: assets/fonts/InstrumentSans.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn.ttf
