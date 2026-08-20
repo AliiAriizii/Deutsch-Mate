@@ -214,22 +214,26 @@ abstract final class AppTheme {
         indicatorColor: AppPalette.glow(AppPalette.blue500),
         indicatorShape: RoundedRectangleBorder(borderRadius: radii.pillBorder),
         elevation: 0,
-        height: 68,
+        // 68 was cramped: the labels sat at 11 with 22px icons, which is under
+        // the 48dp comfortable touch target once padding is accounted for.
+        // 84 gives each destination a real target and lets the label step up to
+        // 13 - the next size on the scale, not an arbitrary nudge.
+        height: 84,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: c.accentSoft, size: 22);
+            return IconThemeData(color: c.accentSoft, size: 26);
           }
-          return IconThemeData(color: c.textTertiary, size: 22);
+          return IconThemeData(color: c.textTertiary, size: 26);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return textTheme.labelSmall?.copyWith(
-              color: c.accentSoft,
-              fontWeight: FontWeight.w600,
-            );
+            return textTheme.labelLarge?.copyWith(color: c.accentSoft);
           }
-          return textTheme.labelSmall?.copyWith(color: c.textTertiary);
+          return textTheme.labelLarge?.copyWith(
+            color: c.textTertiary,
+            fontWeight: FontWeight.w500,
+          );
         }),
       ),
 

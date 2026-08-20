@@ -57,19 +57,27 @@ class _MainContainerScreenState extends State<MainContainerScreen> {
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: context.colors.hairline)),
+          border: BorderDirectional(
+            top: BorderSide(color: context.colors.hairline),
+          ),
         ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
-          destinations: [
-            for (final d in _destinations)
-              NavigationDestination(
-                icon: Icon(d.icon),
-                selectedIcon: Icon(d.selected),
-                label: d.label,
-              ),
-          ],
+        child: SafeArea(
+          top: false,
+          // Keeps the bar clear of the home indicator / gesture area rather
+          // than letting the system inset eat into the touch targets.
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+            destinations: [
+              for (final d in _destinations)
+                NavigationDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.selected),
+                  label: d.label,
+                  tooltip: d.label,
+                ),
+            ],
+          ),
         ),
       ),
     );
