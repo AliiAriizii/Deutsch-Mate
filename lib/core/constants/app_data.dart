@@ -88,7 +88,7 @@ class AppData {
         {"word": "das Jahr", "translation": "سال"},
         {"word": "arbeiten", "translation": "کار کردن"},
         {"word": "studieren", "translation": "تحصیل کردن (دانشگاه)"},
-        {"word": "machten", "translation": "انجام دادن"},
+        {"word": "machen", "translation": "انجام دادن"},
         {"word": "ledig", "translation": "مجرد"},
         {"word": "verheiratet", "translation": "متأهل"},
         {"word": "geschieden", "translation": "طلاق‌گرفته"},
