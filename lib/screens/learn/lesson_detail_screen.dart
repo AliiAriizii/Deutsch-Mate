@@ -85,7 +85,7 @@ class LessonDetailScreen extends StatelessWidget {
             title: 'جمله‌ها',
             eyebrow: 'Redemittel',
             trailing:
-                Text('${sentences.length}', style: context.texts.labelSmall),
+                Text('${sentences.length}', style: context.texts.labelSmall , ),
           ),
           for (final s in sentences)
             _SentenceRow(
