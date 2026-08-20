@@ -16,7 +16,19 @@ void main() {
 
     // The auth screen is the entry point, and it offers both modes.
     expect(find.byType(TextFormField), findsWidgets);
-    expect(find.byType(ElevatedButton), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
+  });
+
+  testWidgets('the Persian interface lays out right-to-left', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const DeutschMateApp());
+    await tester.pumpAndSettle();
+
+    // Without a locale and the localisation delegates, Flutter lays Persian
+    // text out LTR and every directional affordance points the wrong way.
+    final context = tester.element(find.byType(Scaffold).first);
+    expect(Directionality.of(context), TextDirection.rtl);
   });
 
   testWidgets('auth screen toggles between sign in and sign up', (
