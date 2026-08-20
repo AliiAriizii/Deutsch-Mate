@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_typography.dart';
+import '../../theme/app_tokens.dart';
+import '../../widgets/primitives.dart';
+import '../../widgets/quiz_widgets.dart';
+
+/// End-of-level exam. 20 items, 5 points each, pass at 70.
+///
+/// The item bank is unchanged and still hardcoded; it moves to content JSON
+/// with the schema work.
 class FinalExamScreen extends StatefulWidget {
   const FinalExamScreen({super.key});
 
@@ -8,143 +17,171 @@ class FinalExamScreen extends StatefulWidget {
 }
 
 class _FinalExamScreenState extends State<FinalExamScreen> {
-  int _currentQuestion = 0;
+  int _index = 0;
   int _score = 0;
-  bool _isSubmitted = false;
-  int? _selectedAnswer;
+  bool _submitted = false;
+  int? _picked;
 
-  final List<Map<String, dynamic>> _examQuestions = [
-    {
-      'question': 'معنی کلمه "der Vorname" چیست؟',
-      'options': ['نام خانوادگی', 'نام', 'شغل', 'کشور'],
-      'answer': 1,
-    },
-    {
-      'question': 'جمله "Ich ___ aus dem Iran" را کامل کنید.',
-      'options': ['komme', 'kommt', 'heiße', 'wohne'],
-      'answer': 0,
-    },
-    {
-      'question': 'کدام شغل برای یک خانم استفاده می‌شود؟',
-      'options': ['der Arzt', 'die Journalistin', 'der Lehrer', 'der Verkäufer'],
-      'answer': 1,
-    },
-    {
-      'question': 'آرتیکل صحیح کلمه "Tisch" کدام است؟',
-      'options': ['die', 'das', 'der', 'den'],
-      'answer': 2,
-    },
-    {
-      'question': 'معادل عبارت "خانواده من بزرگ است" کدام است؟',
-      'options': ['Meine Familie ist klein.', 'Meine Familie ist groß.', 'Das ist meine Mutter.', 'Ich habe keine Familie.'],
-      'answer': 1,
-    },
-    {
-      'question': 'منفی کلمه "ein Buch" کدام است؟',
-      'options': ['kein Buch', 'keine Buch', 'nicht Buch', 'keinen Buch'],
-      'answer': 0,
-    },
-    {
-      'question': 'شکل صحیح فعل "می‌توانم" (ich) از مصدر können کدام است؟',
-      'options': ['kannst', 'können', 'kann', 'könnt'],
-      'answer': 2,
-    },
-    {
-      'question': 'آرتیکل صحیح کلمه "Brille" چیست؟',
-      'options': ['der', 'das', 'die', 'den'],
-      'answer': 2,
-    },
-    {
-      'question': 'برای بیان روزهای هفته از کدام حرف اضافه استفاده می‌شود؟',
-      'options': ['um', 'am', 'in', 'aus'],
-      'answer': 1,
-    },
-    {
-      'question': 'معنی کلمه "möchten" چیست؟',
-      'options': ['نوشیدن', 'خوردن', 'مایل بودن / خواستن', 'آمدن'],
-      'answer': 2,
-    },
-    {
-      'question': 'فعل "einsteigen" چه نوع فعلی است؟',
-      'options': ['فعل مدال (Modal)', 'فعل جداشدنی (Trennbar)', 'فعل ساده', 'فعل گذشته (Perfekt)'],
-      'answer': 1,
-    },
-    {
-      'question': 'گذشته فعل arbeiten در زمان Perfekt کدام است؟',
-      'options': ['gearbeitet', 'gearbeiten', 'gearbeitet haben', 'gearbeitet sein'],
-      'answer': 0,
-    },
-    {
-      'question': 'کدام کلمه به معنی "ایستگاه قطار" است؟',
-      'options': ['der Flughafen', 'der Bahnhof', 'die Haltestelle', 'das Auto'],
-      'answer': 1,
-    },
-    {
-      'question': 'جمله "Ich habe meinen Schlüssel ___" را کامل کنید.',
-      'options': ['verloren', 'passiert', 'gegangen', 'geblieben'],
-      'answer': 0,
-    },
-    {
-      'question': 'برای پرسیدن ساعت دقیق (مثلاً ۸:۰۰) از کدام حرف اضافه استفاده می‌شود؟',
-      'options': ['am', 'um', 'aus', 'mit'],
-      'answer': 1,
-    },
-    {
-      'question': 'جمع کلمه "das Kind" کدام است؟',
-      'options': ['die Kinder', 'die Kindes', 'die Kind', 'der Kinder'],
-      'answer': 0,
-    },
-    {
-      'question': 'معنی کلمه "kaputt" چیست؟',
-      'options': ['جدید', 'زیبا', 'خراب', 'گران'],
-      'answer': 2,
-    },
-    {
-      'question': 'کدام گزینه پاسخ مناسب برای "Wie alt bist du?" است؟',
-      'options': ['Ich wohne in Teheran.', 'Ich bin 19 Jahre alt.', 'Ich bin Student.', 'Ich komme aus Iran.'],
-      'answer': 1,
-    },
-    {
-      'question': 'در Akkusativ، آرتیکل "der Tisch" به چه چیزی تبدیل می‌شود؟',
-      'options': ['das Tisch', 'die Tisch', 'den Tisch', 'dem Tisch'],
-      'answer': 2,
-    },
-    {
-      'question': 'معادل "چیزی خوردن" در زبان آلمانی چیست؟',
-      'options': ['etwas trinken', 'etwas essen', 'etwas kochen', 'etwas machen'],
-      'answer': 1,
-    },
+  static const _passMark = 70;
+  static const _pointsPerItem = 5;
+
+  static const _questions = <({
+    String prompt,
+    List<String> choices,
+    int answer,
+  })>[
+    (
+      prompt: 'معنی «der Vorname» چیست؟',
+      choices: ['نام خانوادگی', 'نام کوچک', 'شغل', 'کشور'],
+      answer: 1
+    ),
+    (
+      prompt: 'Ich ___ aus dem Iran.',
+      choices: ['komme', 'kommt', 'heiße', 'wohne'],
+      answer: 0
+    ),
+    (
+      prompt: 'کدام شغل برای یک زن است؟',
+      choices: [
+        'der Arzt',
+        'die Journalistin',
+        'der Lehrer',
+        'der Verkäufer'
+      ],
+      answer: 1
+    ),
+    (
+      prompt: 'آرتیکل درست «Tisch» کدام است؟',
+      choices: ['die', 'das', 'der', 'den'],
+      answer: 2
+    ),
+    (
+      prompt: '«خانواده من بزرگ است» کدام است؟',
+      choices: [
+        'Meine Familie ist klein.',
+        'Meine Familie ist groß.',
+        'Das ist meine Mutter.',
+        'Ich habe keine Familie.'
+      ],
+      answer: 1
+    ),
+    (
+      prompt: 'منفی «ein Buch» کدام است؟',
+      choices: ['kein Buch', 'keine Buch', 'nicht Buch', 'keinen Buch'],
+      answer: 0
+    ),
+    (
+      prompt: 'شکل درست können برای ich کدام است؟',
+      choices: ['kannst', 'können', 'kann', 'könnt'],
+      answer: 2
+    ),
+    (
+      prompt: 'آرتیکل درست «Brille» چیست؟',
+      choices: ['der', 'das', 'die', 'den'],
+      answer: 2
+    ),
+    (
+      prompt: 'برای روزهای هفته کدام حرف اضافه؟',
+      choices: ['um', 'am', 'in', 'aus'],
+      answer: 1
+    ),
+    (
+      prompt: 'معنی «möchten» چیست؟',
+      choices: ['نوشیدن', 'خوردن', 'خواستن', 'آمدن'],
+      answer: 2
+    ),
+    (
+      prompt: '«einsteigen» چه نوع فعلی است؟',
+      choices: ['مدال', 'جداشدنی', 'ساده', 'بی‌قاعده'],
+      answer: 1
+    ),
+    (
+      prompt: 'Partizip II فعل arbeiten کدام است؟',
+      choices: ['gearbeitet', 'gearbeiten', 'arbeitete', 'gearbeit'],
+      answer: 0
+    ),
+    (
+      prompt: 'کدام واژه به معنی «ایستگاه قطار» است؟',
+      choices: [
+        'der Flughafen',
+        'der Bahnhof',
+        'die Haltestelle',
+        'das Auto'
+      ],
+      answer: 1
+    ),
+    (
+      prompt: 'Ich habe meinen Schlüssel ___',
+      choices: ['verloren', 'passiert', 'gegangen', 'geblieben'],
+      answer: 0
+    ),
+    (
+      prompt: 'برای ساعت دقیق کدام حرف اضافه؟',
+      choices: ['am', 'um', 'aus', 'mit'],
+      answer: 1
+    ),
+    (
+      prompt: 'جمع «das Kind» کدام است؟',
+      choices: ['die Kinder', 'die Kindes', 'die Kind', 'der Kinder'],
+      answer: 0
+    ),
+    (
+      prompt: 'معنی «kaputt» چیست؟',
+      choices: ['جدید', 'زیبا', 'خراب', 'گران'],
+      answer: 2
+    ),
+    (
+      prompt: 'پاسخ مناسب «Wie alt bist du?» کدام است؟',
+      choices: [
+        'Ich wohne in Teheran.',
+        'Ich bin 19 Jahre alt.',
+        'Ich bin Student.',
+        'Ich komme aus Iran.'
+      ],
+      answer: 1
+    ),
+    (
+      prompt: 'در Akkusativ، «der Tisch» چه می‌شود؟',
+      choices: ['das Tisch', 'die Tisch', 'den Tisch', 'dem Tisch'],
+      answer: 2
+    ),
+    (
+      prompt: '«چیزی خوردن» به آلمانی کدام است؟',
+      choices: [
+        'etwas trinken',
+        'etwas essen',
+        'etwas kochen',
+        'etwas machen'
+      ],
+      answer: 1
+    ),
   ];
 
-  void _selectAnswer(int index) {
-    if (_selectedAnswer != null) return;
+  void _pick(int i) {
+    if (_picked != null) return;
     setState(() {
-      _selectedAnswer = index;
-      if (index == _examQuestions[_currentQuestion]['answer']) {
-        _score += 5;
-      }
+      _picked = i;
+      if (i == _questions[_index].answer) _score += _pointsPerItem;
     });
   }
 
-  void _nextQuestion() {
-    if (_currentQuestion < _examQuestions.length - 1) {
+  void _next() {
+    if (_index < _questions.length - 1) {
       setState(() {
-        _currentQuestion++;
-        _selectedAnswer = null;
+        _index++;
+        _picked = null;
       });
     } else {
-      setState(() {
-        _isSubmitted = true;
-      });
+      setState(() => _submitted = true);
     }
   }
 
-  void _restartExam() {
+  void _restart() {
     setState(() {
-      _currentQuestion = 0;
+      _index = 0;
       _score = 0;
-      _isSubmitted = false;
-      _selectedAnswer = null;
+      _submitted = false;
+      _picked = null;
     });
   }
 
@@ -152,145 +189,122 @@ class _FinalExamScreenState extends State<FinalExamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isSubmitted ? 'نتیجه آزمون' : 'سوال ${_currentQuestion + 1} از ${_examQuestions.length}'),
+        title: Text(_submitted ? 'نتیجه' : 'آزمون جامع'),
+        actions: [
+          if (!_submitted) ScoreReadout(value: _score, unit: 'از 100'),
+        ],
       ),
-      body: _isSubmitted ? _buildResultScreen() : _buildQuizBody(),
+      body: SafeArea(
+        child: _submitted ? _result(context) : _question(context),
+      ),
     );
   }
 
-  Widget _buildQuizBody() {
-    final q = _examQuestions[_currentQuestion];
-    final double progress = (_currentQuestion + 1) / _examQuestions.length;
+  Widget _question(BuildContext context) {
+    final spacing = context.spacing;
+    final q = _questions[_index];
+    final revealed = _picked != null;
+    // German prompts must read LTR even inside the Persian layout.
+    final isGerman = !RegExp(r'[؀-ۿ]').hasMatch(q.prompt);
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(horizontal: spacing.gutter),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Colors.grey[800],
-            color: const Color(0xFFFFCC00),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(4),
+          AppProgressBar(
+            value: (_index + 1) / _questions.length,
+            height: 4,
           ),
-          const SizedBox(height: 24),
-
-          Container(
-            padding: const EdgeInsets.all(20),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFFFCC00).withValues(alpha: 0.3)),
-            ),
+          SizedBox(height: spacing.lg),
+          PlateLabel('پرسش ${_index + 1} از ${_questions.length}'),
+          SizedBox(height: spacing.md),
+          AppCard(
+            background: context.colors.surface,
+            padding: EdgeInsets.all(spacing.lg),
             child: Text(
-              q['question'],
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              q.prompt,
+              style: context.texts.titleLarge,
+              textDirection:
+                  isGerman ? TextDirection.ltr : TextDirection.rtl,
+              textAlign: TextAlign.start,
             ),
           ),
-          const SizedBox(height: 24),
-
-          ...List.generate(q['options'].length, (index) {
-            Color btnColor = const Color(0xFF1A1A1A);
-            Color textColor = Colors.white;
-
-            if (_selectedAnswer != null) {
-              if (index == q['answer']) {
-                btnColor = Colors.green[800]!;
-              } else if (index == _selectedAnswer) {
-                btnColor = Colors.red[800]!;
-              }
-            }
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: btnColor,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  side: BorderSide(color: _selectedAnswer == index ? const Color(0xFFFFCC00) : Colors.white10),
-                ),
-                onPressed: () => _selectAnswer(index),
-                child: Text(
-                  q['options'][index],
-                  style: TextStyle(fontSize: 16, color: textColor, fontWeight: FontWeight.bold),
-                ),
-              ),
-            );
-          }),
-
-          const Spacer(),
-
-          if (_selectedAnswer != null)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFCC00),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: _nextQuestion,
-                child: Text(
-                  _currentQuestion == _examQuestions.length - 1 ? 'مشاهده نتیجه' : 'سوال بعدی →',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+          SizedBox(height: spacing.lg),
+          Expanded(
+            child: ListView(
+              children: [
+                for (var i = 0; i < q.choices.length; i++)
+                  ChoiceButton(
+                    label: q.choices[i],
+                    state: switch (_picked) {
+                      null => ChoiceState.idle,
+                      _ when i == q.answer && i == _picked =>
+                        ChoiceState.selectedCorrect,
+                      _ when i == q.answer => ChoiceState.revealedCorrect,
+                      _ when i == _picked => ChoiceState.selectedWrong,
+                      _ => ChoiceState.idle,
+                    },
+                    onTap: revealed ? null : () => _pick(i),
+                  ),
+              ],
+            ),
+          ),
+          if (revealed)
+            FilledButton(
+              onPressed: _next,
+              child: Text(
+                _index == _questions.length - 1 ? 'دیدن نتیجه' : 'بعدی',
               ),
             ),
+          SizedBox(height: spacing.lg),
         ],
       ),
     );
   }
 
-  Widget _buildResultScreen() {
-    final bool isPassed = _score >= 70;
+  Widget _result(BuildContext context) {
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final passed = _score >= _passMark;
+    final tint = passed ? colors.success : colors.warning;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isPassed ? Icons.workspace_premium : Icons.sentiment_dissatisfied,
-              size: 100,
-              color: isPassed ? const Color(0xFFFFCC00) : Colors.redAccent,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              isPassed ? 'تبریک! آزمون را با موفقیت پاس کردی 🎉' : 'متأسفانه حد نصاب قبولی را کسب نکردی',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'نمره شما: $_score از ۱۰۰',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isPassed ? Colors.greenAccent : Colors.redAccent,
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: spacing.gutter),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PlateLabel(passed ? 'قبول' : 'حد نصاب نرسید', color: tint),
+          SizedBox(height: spacing.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '$_score',
+                style: AppTypography.monoStyle(
+                  color: tint,
+                  size: 56,
+                  weight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isPassed ? 'حد نصاب قبولی: ۷۰ | نمره عالی!' : 'حد نصاب قبولی: ۷۰ | دوباره تلاش کن!',
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 36),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFCC00),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-              ),
-              onPressed: _restartExam,
-              child: const Text('شروع مجدد آزمون', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ],
-        ),
+              SizedBox(width: spacing.sm),
+              Text('/ 100', style: context.texts.titleMedium),
+            ],
+          ),
+          SizedBox(height: spacing.lg),
+          AppProgressBar(value: _score / 100, tint: tint),
+          SizedBox(height: spacing.md),
+          Text(
+            passed
+                ? 'سطح A1.1 را رد کردی. سراغ A1.2 برو.'
+                : 'حد قبولی 70 است. درس‌های ضعیف را مرور کن و دوباره امتحان بده.',
+            style: context.texts.bodyMedium,
+          ),
+          SizedBox(height: spacing.xxl),
+          FilledButton(onPressed: _restart, child: const Text('آزمون تازه')),
+        ],
       ),
     );
   }

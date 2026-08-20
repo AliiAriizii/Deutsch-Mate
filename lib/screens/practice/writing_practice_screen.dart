@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../core/utils/audio_helper.dart';
-import 'package:deutsch_mate/core/constants/app_data.dart';
 
+import '../../core/constants/app_data.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/app_tokens.dart';
+import '../../widgets/primitives.dart';
+import '../../widgets/quiz_widgets.dart';
+import '../../widgets/speak_button.dart';
+import 'lesson_filter.dart';
+
+/// Translate a Persian prompt into German, graded with an edit-distance
+/// tolerance so a single typo is "almost" rather than "wrong".
 class WritingPracticeScreen extends StatefulWidget {
   const WritingPracticeScreen({super.key});
 
@@ -10,19 +18,17 @@ class WritingPracticeScreen extends StatefulWidget {
 }
 
 class _WritingPracticeScreenState extends State<WritingPracticeScreen> {
-  final TextEditingController _controller = TextEditingController();
-  int _currentIndex = 0;
-  String _message = '';
-  Color _messageColor = Colors.white;
-  bool _isAnswered = false;
-
-  String _selectedLesson = 'Alle';
-  List<Map<String, String>> _questions = [];
+  final _controller = TextEditingController();
+  int _index = 0;
+  int _correct = 0;
+  FeedbackKind? _outcome;
+  String _lessonFilter = kAllLessons;
+  List<_Prompt> _prompts = const [];
 
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+    _load();
   }
 
   @override
@@ -31,300 +37,189 @@ class _WritingPracticeScreenState extends State<WritingPracticeScreen> {
     super.dispose();
   }
 
-  void _loadQuestions() {
-    List<Map<String, String>> extracted = [];
+  void _load() {
+    final prompts = <_Prompt>[];
+    for (final lesson in AppData.lessons) {
+      final title = lesson['title']?.toString() ?? '';
+      if (_lessonFilter != kAllLessons && title != _lessonFilter) continue;
 
-    for (var lesson in AppData.lessons) {
-      final title = lesson['title'] as String? ?? '';
-
-      if (_selectedLesson != 'Alle' && title != _selectedLesson) {
-        continue;
-      }
-
-      final sentences = lesson['sentences'] as List<dynamic>? ?? [];
-      for (var item in sentences) {
-        final de = item['de'] as String? ?? '';
-        final fa = item['fa'] as String? ?? '';
-
-        if (de.isNotEmpty && fa.isNotEmpty) {
-          extracted.add({
-            'prompt': 'ترجمه کنید: "$fa"',
-            'answer': de,
-            'lesson': title,
-          });
-        }
+      for (final s in (lesson['sentences'] as List? ?? const [])) {
+        final de = (s['de'] ?? '').toString();
+        final fa = (s['fa'] ?? '').toString();
+        if (de.isEmpty || fa.isEmpty) continue;
+        prompts.add(_Prompt(persian: fa, german: de, lesson: title));
       }
     }
-
-    extracted.shuffle();
+    prompts.shuffle();
 
     setState(() {
-      _questions = extracted;
-      _currentIndex = 0;
+      _prompts = prompts;
+      _index = 0;
       _controller.clear();
-      _message = '';
-      _isAnswered = false;
+      _outcome = null;
     });
   }
 
-  String _normalize(String text) {
-    return text
-        .toLowerCase()
-        .replaceAll(RegExp(r'[.,!?;\-]'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-  }
+  static String _normalize(String text) => text
+      .toLowerCase()
+      .replaceAll(RegExp(r'[.,!?;:\-]'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 
-  // الگوریتم محاسبه میزان اختلاف دو رشته (Levenshtein Distance)
-  int _levenshteinDistance(String s1, String s2) {
-    if (s1 == s2) return 0;
-    if (s1.isEmpty) return s2.length;
-    if (s2.isEmpty) return s1.length;
+  static int _distance(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
 
-    List<int> v0 = List<int>.generate(s2.length + 1, (i) => i);
-    List<int> v1 = List<int>.filled(s2.length + 1, 0);
+    var previous = List<int>.generate(b.length + 1, (i) => i);
+    var current = List<int>.filled(b.length + 1, 0);
 
-    for (int i = 0; i < s1.length; i++) {
-      v1[0] = i + 1;
-
-      for (int j = 0; j < s2.length; j++) {
-        int cost = (s1[i] == s2[j]) ? 0 : 1;
-        v1[j + 1] = [
-          v1[j] + 1,
-          v0[j + 1] + 1,
-          v0[j] + cost,
-        ].reduce((a, b) => a < b ? a : b);
+    for (var i = 0; i < a.length; i++) {
+      current[0] = i + 1;
+      for (var j = 0; j < b.length; j++) {
+        final cost = a[i] == b[j] ? 0 : 1;
+        current[j + 1] = [
+          current[j] + 1,
+          previous[j + 1] + 1,
+          previous[j] + cost,
+        ].reduce((x, y) => x < y ? x : y);
       }
-
-      for (int j = 0; j <= s2.length; j++) {
-        v0[j] = v1[j];
-      }
+      final swap = previous;
+      previous = current;
+      current = swap;
     }
-
-    return v1[s2.length];
+    return previous[b.length];
   }
 
-  void _checkAnswer() {
-    if (_controller.text.trim().isEmpty || _questions.isEmpty) return;
+  void _check() {
+    if (_controller.text.trim().isEmpty || _prompts.isEmpty) return;
 
-    final userAnswer = _normalize(_controller.text);
-    final correctAnswer = _normalize(_questions[_currentIndex]['answer']!);
-
-    final distance = _levenshteinDistance(userAnswer, correctAnswer);
-
-    // حد مجاز خطا: برای جملات کوتاه ۱ کاراکتر و برای جملات بلندتر حداکثر ۲ کاراکتر
-    final maxAllowedDistance = correctAnswer.length > 15 ? 2 : 1;
+    final expected = _normalize(_prompts[_index].german);
+    final given = _normalize(_controller.text);
+    final distance = _distance(given, expected);
+    final tolerance = expected.length > 15 ? 2 : 1;
 
     setState(() {
-      _isAnswered = true;
       if (distance == 0) {
-        _message = 'Richtig! عالی بود ✅';
-        _messageColor = Colors.greenAccent;
-      } else if (distance <= maxAllowedDistance) {
-        _message = 'قبوله! (با کمی اشتباه تایپی) ⚠️\nشکل کامل: "${_questions[_currentIndex]['answer']}"';
-        _messageColor = Colors.orangeAccent;
+        _outcome = FeedbackKind.correct;
+        _correct++;
+      } else if (distance <= tolerance) {
+        _outcome = FeedbackKind.almost;
+        _correct++;
       } else {
-        _message = 'اشتباه! پاسخ درست:\n"${_questions[_currentIndex]['answer']}"';
-        _messageColor = Colors.redAccent;
+        _outcome = FeedbackKind.wrong;
       }
     });
-
-    AudioHelper.speakDe(_questions[_currentIndex]['answer']!);
   }
 
-  void _nextQuestion() {
-    if (_questions.isEmpty) return;
-
+  void _next() {
     setState(() {
       _controller.clear();
-      _message = '';
-      _isAnswered = false;
-      if (_currentIndex < _questions.length - 1) {
-        _currentIndex++;
+      _outcome = null;
+      if (_index < _prompts.length - 1) {
+        _index++;
       } else {
-        _currentIndex = 0;
-        _questions.shuffle();
+        _index = 0;
+        _prompts = List.of(_prompts)..shuffle();
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<String> lessonOptions = [
-      'Alle',
-      ...AppData.lessons.map((e) => e['title'] as String),
-    ];
+    final spacing = context.spacing;
+    final answered = _outcome != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text(
-          _questions.isNotEmpty
-              ? 'Writing Practice (${_currentIndex + 1}/${_questions.length})'
-              : 'Writing Practice',
-          style: const TextStyle(color: Colors.white, fontSize: 18),
-        ),
+        title: const Text('نوشتن'),
+        actions: [ScoreReadout(value: _correct, unit: 'درست')],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // منوی انتخاب درس
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SafeArea(
+        child: _prompts.isEmpty
+            ? const EmptyState(
+                title: 'جمله‌ای برای این درس نیست',
+                action: 'درس دیگری انتخاب کن یا همه درس‌ها را ببین.',
+                icon: Icons.filter_alt_outlined,
+              )
+            : ListView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: spacing.gutter,
+                  vertical: spacing.sm,
+                ),
                 children: [
-                  const Text(
-                    'انتخاب درس:',
-                    style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  DropdownButton<String>(
-                    value: _selectedLesson,
-                    dropdownColor: const Color(0xFF2A2A2A),
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                    items: lessonOptions.map((String lesson) {
-                      return DropdownMenuItem<String>(
-                        value: lesson,
-                        child: Text(lesson == 'Alle' ? 'همه درس‌ها (Alle)' : lesson),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) {
-                        _selectedLesson = newValue;
-                        _loadQuestions();
-                      }
+                  LessonFilter(
+                    value: _lessonFilter,
+                    onChanged: (v) {
+                      _lessonFilter = v;
+                      _load();
                     },
                   ),
+                  SizedBox(height: spacing.xl),
+
+                  PlateLabel(
+                    '${_prompts[_index].lesson} · '
+                    '${_index + 1}/${_prompts.length}',
+                  ),
+                  SizedBox(height: spacing.md),
+                  Text(
+                    _prompts[_index].persian,
+                    style: context.texts.headlineMedium,
+                  ),
+                  SizedBox(height: spacing.xs),
+                  Text('به آلمانی بنویس', style: context.texts.bodySmall),
+                  SizedBox(height: spacing.xl),
+
+                  TextField(
+                    controller: _controller,
+                    enabled: !answered,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    maxLines: 3,
+                    minLines: 2,
+                    textDirection: TextDirection.ltr,
+                    style: AppTypography.monoStyle(
+                      color: context.colors.textPrimary,
+                      size: 17,
+                    ),
+                    decoration: const InputDecoration(hintText: 'Deutsch …'),
+                    onSubmitted: (_) => answered ? _next() : _check(),
+                  ),
+                  SizedBox(height: spacing.lg),
+
+                  FilledButton(
+                    onPressed: answered ? _next : _check,
+                    child: Text(answered ? 'جمله بعدی' : 'بررسی'),
+                  ),
+
+                  if (answered) ...[
+                    SizedBox(height: spacing.lg),
+                    FeedbackBanner(
+                      kind: _outcome!,
+                      headline: switch (_outcome!) {
+                        FeedbackKind.correct => 'Richtig',
+                        FeedbackKind.almost => 'Fast richtig',
+                        FeedbackKind.wrong => 'Falsch',
+                      },
+                      detail: _prompts[_index].german,
+                      trailing: SpeakButton(text: _prompts[_index].german),
+                    ),
+                  ],
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-
-            if (_questions.isNotEmpty) ...[
-              // صورت سوال
-              Container(
-                padding: const EdgeInsets.all(20),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFFCC00).withValues(alpha: 0.3)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _questions[_currentIndex]['lesson'] ?? '',
-                        style: const TextStyle(fontSize: 12, color: Colors.white54),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _questions[_currentIndex]['prompt']!,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // فیلد ورودی متن
-              TextField(
-                controller: _controller,
-                enabled: !_isAnswered,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-                decoration: InputDecoration(
-                  hintText: 'پاسخ به آلمانی...',
-                  hintStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: const Color(0xFF1A1A1A),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white12),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFFFCC00)),
-                  ),
-                ),
-                onSubmitted: (_) {
-                  if (!_isAnswered) _checkAnswer();
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // دکمه ثبت پاسخ / سوال بعدی
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFCC00),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: _isAnswered ? _nextQuestion : _checkAnswer,
-                  child: Text(
-                    _isAnswered ? 'سوال بعدی →' : 'بررسی پاسخ',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // پیام راهنما و فیدبک
-              if (_message.isNotEmpty) ...[
-                Text(
-                  _message,
-                  style: TextStyle(fontSize: 16, color: _messageColor, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                IconButton(
-                  icon: const Icon(Icons.volume_up_rounded, color: Color(0xFFFFCC00), size: 32),
-                  onPressed: () => AudioHelper.speakDe(_questions[_currentIndex]['answer']!),
-                ),
-              ],
-            ] else ...[
-              const Padding(
-                padding: EdgeInsets.only(top: 40),
-                child: Center(
-                  child: Text(
-                    'هیچ جمله‌ای برای این درس یافت نشد!',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
+}
+
+class _Prompt {
+  const _Prompt({
+    required this.persian,
+    required this.german,
+    required this.lesson,
+  });
+
+  final String persian;
+  final String german;
+  final String lesson;
 }

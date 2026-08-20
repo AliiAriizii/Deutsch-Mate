@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_tokens.dart';
+import '../../widgets/primitives.dart';
+import '../../widgets/quiz_widgets.dart';
+
+/// Grammar multiple choice.
+///
+/// The item bank is still the three hardcoded questions from before - it moves
+/// into content JSON with the schema work. The interaction is what changed: the
+/// answer no longer auto-advances after 1.2s, which gave the learner no time to
+/// read why they were wrong.
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
 
@@ -8,100 +18,113 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  int _questionIndex = 0;
+  int _index = 0;
   int _score = 0;
-  bool _answered = false;
-  int? _selectedChoice;
+  int? _picked;
 
-  final List<Map<String, dynamic>> _questions = [
-    {
-      'question': 'Ich ___ aus dem Iran.',
-      'choices': ['bist', 'bin', 'sind', 'ist'],
-      'answer': 1,
-    },
-    {
-      'question': 'Wie ___ du?',
-      'choices': ['heiße', 'heißt', 'sein', 'kommt'],
-      'answer': 1,
-    },
-    {
-      'question': 'Das ist ___ Buch.',
-      'choices': ['der', 'die', 'das', 'den'],
-      'answer': 2,
-    },
+  static const _questions = [
+    (
+      prompt: 'Ich ___ aus dem Iran.',
+      choices: ['bist', 'bin', 'sind', 'ist'],
+      answer: 1,
+      note: 'ich + sein',
+    ),
+    (
+      prompt: 'Wie ___ du?',
+      choices: ['heiße', 'heißt', 'sein', 'kommt'],
+      answer: 1,
+      note: 'du + heißen',
+    ),
+    (
+      prompt: 'Das ist ___ Buch.',
+      choices: ['der', 'die', 'das', 'den'],
+      answer: 2,
+      note: 'das Buch, Nominativ',
+    ),
   ];
 
-  void _answerQuestion(int choiceIndex) {
-    if (_answered) return;
+  void _pick(int i) {
+    if (_picked != null) return;
     setState(() {
-      _answered = true;
-      _selectedChoice = choiceIndex;
-      if (choiceIndex == _questions[_questionIndex]['answer']) {
-        _score += 20;
-      }
+      _picked = i;
+      if (i == _questions[_index].answer) _score += 20;
     });
+  }
 
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted) return;
-      setState(() {
-        _answered = false;
-        _selectedChoice = null;
-        if (_questionIndex < _questions.length - 1) {
-          _questionIndex++;
-        } else {
-          _questionIndex = 0;
-        }
-      });
+  void _next() {
+    setState(() {
+      _picked = null;
+      _index = (_index + 1) % _questions.length;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final q = _questions[_questionIndex];
+    final spacing = context.spacing;
+    final q = _questions[_index];
+    final revealed = _picked != null;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Quiz (${_questionIndex + 1}/${_questions.length})')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Score: $_score XP', style: const TextStyle(color: Color(0xFFFFCC00), fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(24),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white12),
+      appBar: AppBar(
+        title: const Text('آزمون گرامر'),
+        actions: [ScoreReadout(value: _score, unit: 'XP')],
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.gutter),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppProgressBar(
+                value: (_index + 1) / _questions.length,
+                height: 4,
               ),
-              child: Text(q['question'], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 24),
-            ...List.generate(q['choices'].length, (index) {
-              Color btnColor = const Color(0xFF1A1A1A);
-              if (_answered) {
-                if (index == q['answer']) {
-                  btnColor = Colors.green[800]!;
-                } else if (index == _selectedChoice) {
-                  btnColor = Colors.red[800]!;
-                }
-              }
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: btnColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () => _answerQuestion(index),
-                  child: Text(q['choices'][index], style: const TextStyle(fontSize: 16, color: Colors.white)),
+              SizedBox(height: spacing.xl),
+              PlateLabel('پرسش ${_index + 1} از ${_questions.length}'),
+              SizedBox(height: spacing.md),
+              AppCard(
+                background: context.colors.surface,
+                padding: EdgeInsets.all(spacing.xl),
+                child: Text(
+                  q.prompt,
+                  style: context.texts.headlineMedium,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.start,
                 ),
-              );
-            }),
-          ],
+              ),
+              SizedBox(height: spacing.xl),
+              for (var i = 0; i < q.choices.length; i++)
+                ChoiceButton(
+                  label: q.choices[i],
+                  monospace: true,
+                  state: switch (_picked) {
+                    null => ChoiceState.idle,
+                    _ when i == q.answer && i == _picked =>
+                      ChoiceState.selectedCorrect,
+                    _ when i == q.answer => ChoiceState.revealedCorrect,
+                    _ when i == _picked => ChoiceState.selectedWrong,
+                    _ => ChoiceState.idle,
+                  },
+                  onTap: revealed ? null : () => _pick(i),
+                ),
+              const Spacer(),
+              if (revealed) ...[
+                FeedbackBanner(
+                  kind: _picked == q.answer
+                      ? FeedbackKind.correct
+                      : FeedbackKind.wrong,
+                  headline: _picked == q.answer ? 'Richtig' : 'Falsch',
+                  detail: q.note,
+                ),
+                SizedBox(height: spacing.lg),
+                FilledButton(
+                  onPressed: _next,
+                  child: const Text('پرسش بعدی'),
+                ),
+              ],
+              SizedBox(height: spacing.lg),
+            ],
+          ),
         ),
       ),
     );

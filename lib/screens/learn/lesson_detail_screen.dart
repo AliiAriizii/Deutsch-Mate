@@ -1,129 +1,218 @@
 import 'package:flutter/material.dart';
-import '../../core/utils/audio_helper.dart';
 
+import '../../core/german.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/app_tokens.dart';
+import '../../widgets/gender_chip.dart';
+import '../../widgets/primitives.dart';
+import '../../widgets/speak_button.dart';
+
+/// One Lektion: grammar, word field, example sentences.
+///
+/// The word list is where the gender colour-coding does most of its work - a
+/// learner scanning this page sees three colours, not 30 identical rows.
 class LessonDetailScreen extends StatelessWidget {
-  final Map<String, dynamic> lessonData;
-
   const LessonDetailScreen({super.key, required this.lessonData});
+
+  final Map<String, dynamic> lessonData;
 
   @override
   Widget build(BuildContext context) {
-    final List words = lessonData['words'];
-    final List sentences = lessonData['sentences'];
+    final spacing = context.spacing;
+    final words = (lessonData['words'] as List?) ?? const [];
+    final sentences = (lessonData['sentences'] as List?) ?? const [];
+    final title = lessonData['name']?.toString() ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(lessonData['title']),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.volume_up, color: Color(0xFFFFCC00)),
-            onPressed: () => AudioHelper.speakDe(lessonData['name']),
-          ),
-        ],
+        title: Text(lessonData['title']?.toString() ?? ''),
+        actions: [SpeakButton(text: title, size: 22)],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(
+          spacing.gutter,
+          spacing.sm,
+          spacing.gutter,
+          spacing.xxxl,
+        ),
         children: [
           Text(
-            lessonData['name'],
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFCC00)),
+            title,
+            style: context.texts.displaySmall,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.start,
           ),
-          const SizedBox(height: 4),
-          Text('موضوع: ${lessonData['topic']}', style: const TextStyle(color: Colors.grey, fontSize: 14)),
-          const SizedBox(height: 12),
-          
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFCC00).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFFCC00).withValues(alpha: 0.3)),
+          SizedBox(height: spacing.sm),
+          Text(
+            lessonData['topic']?.toString() ?? '',
+            style: context.texts.bodySmall,
+          ),
+          SizedBox(height: spacing.xl),
+
+          // Grammar in mono on its own surface: it is a structure to be read
+          // precisely, not prose.
+          SectionHeader(title: 'ساختار', eyebrow: 'Grammatik'),
+          AppCard(
+            background: context.colors.surface,
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                lessonData['grammar']?.toString() ?? '',
+                style: AppTypography.monoStyle(
+                  color: context.colors.textPrimary,
+                  size: 13,
+                ),
+                textDirection: TextDirection.ltr,
+                textAlign: TextAlign.start,
+              ),
             ),
+          ),
+          SizedBox(height: spacing.xl),
+
+          SectionHeader(
+            title: 'واژگان',
+            eyebrow: 'Wortschatz',
+            trailing: Text('${words.length}', style: context.texts.labelSmall),
+          ),
+          for (final w in words)
+            _VocabRow(
+              entry: (w['word'] ?? '').toString(),
+              translation: (w['translation'] ?? '').toString(),
+            ),
+          SizedBox(height: spacing.xl),
+
+          SectionHeader(
+            title: 'جمله‌ها',
+            eyebrow: 'Redemittel',
+            trailing:
+                Text('${sentences.length}', style: context.texts.labelSmall),
+          ),
+          for (final s in sentences)
+            _SentenceRow(
+              german: (s['de'] ?? '').toString(),
+              persian: (s['fa'] ?? '').toString(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reserved width for the article chip. Sized to the widest chip so the
+/// German column is flush whether an entry has an article or not.
+const double _articleSlot = 38;
+
+class _VocabRow extends StatelessWidget {
+  const _VocabRow({required this.entry, required this.translation});
+
+  final String entry;
+  final String translation;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final noun = parseGermanEntry(entry);
+
+    return Container(
+      margin: EdgeInsets.only(bottom: spacing.xs),
+      padding: EdgeInsetsDirectional.only(
+        start: spacing.md,
+        end: spacing.xs,
+        top: spacing.sm,
+        bottom: spacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: context.radii.controlBorder,
+        border: Border.all(color: colors.hairline),
+      ),
+      child: Row(
+        children: [
+          // Fixed slot whether or not there is an article, so the German words
+          // line up in a column instead of going ragged on every entry that is
+          // a verb or a proper noun.
+          SizedBox(
+            width: _articleSlot,
+            child: noun.hasArticle
+                ? Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: GenderChip(article: noun.article!, compact: true),
+                  )
+                : null,
+          ),
+          SizedBox(width: spacing.sm),
+          // German hugs the start edge, Persian the end edge, gap in between.
+          // Expanding the German instead put its glyphs right next to the
+          // translation with all the empty space on the far side.
+          Text(
+            noun.word,
+            style: context.texts.bodyLarge,
+            textDirection: TextDirection.ltr,
+          ),
+          SizedBox(width: spacing.md),
+          Expanded(
+            child: Text(
+              translation,
+              style: context.texts.bodySmall?.copyWith(
+                color: colors.textSecondary,
+              ),
+              textAlign: TextAlign.end,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SpeakButton(text: entry, size: 18),
+        ],
+      ),
+    );
+  }
+}
+
+class _SentenceRow extends StatelessWidget {
+  const _SentenceRow({required this.german, required this.persian});
+
+  final String german;
+  final String persian;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final spacing = context.spacing;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: spacing.sm),
+      padding: EdgeInsets.all(spacing.md),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: context.radii.controlBorder,
+        // A leading rule instead of a full border: quieter, and it mirrors.
+        border: BorderDirectional(
+          start: BorderSide(color: colors.accent, width: 2),
+          top: BorderSide(color: colors.hairline),
+          bottom: BorderSide(color: colors.hairline),
+          end: BorderSide(color: colors.hairline),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('📐 گرامر درس:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFFCC00))),
-                const SizedBox(height: 4),
-                Text(lessonData['grammar'], style: const TextStyle(fontSize: 13, color: Colors.white70)),
+                Text(
+                  german,
+                  style: context.texts.bodyLarge,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.start,
+                ),
+                SizedBox(height: spacing.xxs),
+                Text(persian, style: context.texts.bodySmall),
               ],
             ),
           ),
-          
-          const SizedBox(height: 20),
-          const Text('🧠 لغات کلیدی کتاب (Wortschatz)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          
-          ...words.map((w) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(w['word']!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
-                    Row(
-                      children: [
-                        Text(w['translation']!, style: const TextStyle(fontSize: 14, color: Color(0xFFFFCC00))),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.volume_up_rounded, color: Color(0xFFFFCC00), size: 20),
-                          onPressed: () => AudioHelper.speakDe(w['word']!),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              )),
-          
-          const SizedBox(height: 24),
-          const Text('💬 جملات و مکالمات کاربردی (Sätze)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFFFCC00).withValues(alpha: 0.3)),
-            ),
-            child: Column(
-              children: sentences.map((s) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(10),
-                    border: const Border(left: BorderSide(color: Color(0xFFFFCC00), width: 4)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(s['de']!, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            Text(s['fa']!, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.volume_up_rounded, color: Color(0xFFFFCC00)),
-                        onPressed: () => AudioHelper.speakDe(s['de']!),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
+          SpeakButton(text: german),
         ],
       ),
     );

@@ -1,7 +1,20 @@
 import 'package:flutter/material.dart';
-import '../../core/utils/audio_helper.dart';
-import 'package:deutsch_mate/core/constants/app_data.dart'; // مطمئن شو مسیر ایمپورت AppData متناسب با پروژه‌ات باشه
 
+import '../../core/constants/app_data.dart';
+import '../../core/german.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/app_tokens.dart';
+import '../../widgets/gender_chip.dart';
+import '../../widgets/primitives.dart';
+import '../../widgets/quiz_widgets.dart';
+import '../../widgets/speak_button.dart';
+import 'lesson_filter.dart';
+
+/// Review cards.
+///
+/// Still a single-session queue rather than real Leitner boxes with intervals -
+/// that needs the local database. What is real here is the review accent
+/// (violet), which marks this as a different mode from learning new material.
 class FlashcardScreen extends StatefulWidget {
   const FlashcardScreen({super.key});
 
@@ -10,263 +23,212 @@ class FlashcardScreen extends StatefulWidget {
 }
 
 class _FlashcardScreenState extends State<FlashcardScreen> {
-  bool _showTranslation = false;
-  int _initialTotal = 0;
-  String _selectedLesson = 'Alle'; // گزینه‌ پیش‌فرض: همه درس‌ها
-  late List<Map<String, String>> _cards;
+  bool _revealed = false;
+  int _sessionSize = 0;
+  int _known = 0;
+  String _lessonFilter = kAllLessons;
+  List<_Card> _cards = const [];
 
   @override
   void initState() {
     super.initState();
-    _loadCards();
+    _load();
   }
 
-  // بارگذاری و فیلتر کردن کارت‌ها از AppData
-  void _loadCards() {
-    List<Map<String, String>> extracted = [];
+  void _load() {
+    final cards = <_Card>[];
+    for (final lesson in AppData.lessons) {
+      final title = lesson['title']?.toString() ?? '';
+      if (_lessonFilter != kAllLessons && title != _lessonFilter) continue;
 
-    for (var lesson in AppData.lessons) {
-      final title = lesson['title'] as String? ?? '';
-
-      if (_selectedLesson != 'Alle' && title != _selectedLesson) {
-        continue;
-      }
-
-      final words = lesson['words'] as List<dynamic>? ?? [];
-      for (var item in words) {
-        extracted.add({
-          'de': item['word'] ?? '',
-          'fa': item['translation'] ?? '',
-          'lesson': title,
-        });
+      for (final w in (lesson['words'] as List? ?? const [])) {
+        cards.add(
+          _Card(
+            entry: (w['word'] ?? '').toString(),
+            translation: (w['translation'] ?? '').toString(),
+            lesson: title,
+          ),
+        );
       }
     }
-
-    // تصادفی کردن کارت‌ها برای یادگیری بهتر
-    extracted.shuffle();
+    cards.shuffle();
 
     setState(() {
-      _cards = extracted;
-      _initialTotal = _cards.length;
-      _showTranslation = false;
+      _cards = cards;
+      _sessionSize = cards.length;
+      _known = 0;
+      _revealed = false;
     });
   }
 
-  void _markAsNotLearned() {
+  void _again() {
     if (_cards.isEmpty) return;
     setState(() {
-      _showTranslation = false;
-      final currentCard = _cards.removeAt(0);
-      _cards.add(currentCard); // کارت می‌ره ته صف تا دوباره مرور بشه
+      _revealed = false;
+      final card = _cards.removeAt(0);
+      _cards.add(card); // back of the queue
     });
   }
 
-  void _markAsLearned() {
+  void _got() {
     if (_cards.isEmpty) return;
     setState(() {
-      _showTranslation = false;
-      _cards.removeAt(0); // کارت از لیست یادگیری این جلسه حذف میشه
+      _revealed = false;
+      _known++;
+      _cards.removeAt(0);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<String> lessonOptions = [
-      'Alle',
-      ...AppData.lessons.map((e) => e['title'] as String),
-    ];
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final done = _sessionSize - _cards.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text(
-          'Leitner Box (${_cards.length} کارت باقی‌مانده)',
-          style: const TextStyle(color: Colors.white, fontSize: 18),
-        ),
+        title: const Text('کارت‌های مرور'),
+        actions: [ScoreReadout(value: _known, unit: 'بلد')],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // انتخاب درس (Dropdown)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.gutter),
+          child: Column(
+            children: [
+              LessonFilter(
+                value: _lessonFilter,
+                onChanged: (v) {
+                  _lessonFilter = v;
+                  _load();
+                },
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'انتخاب درس:',
-                    style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  DropdownButton<String>(
-                    value: _selectedLesson,
-                    dropdownColor: const Color(0xFF2A2A2A),
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                    items: lessonOptions.map((String lesson) {
-                      return DropdownMenuItem<String>(
-                        value: lesson,
-                        child: Text(lesson == 'Alle' ? 'همه درس‌ها (Alle)' : lesson),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) {
-                        _selectedLesson = newValue;
-                        _loadCards();
-                      }
-                    },
-                  ),
-                ],
+              SizedBox(height: spacing.md),
+              if (_sessionSize > 0)
+                AppProgressBar(
+                  value: _sessionSize == 0 ? 0 : done / _sessionSize,
+                  tint: colors.review,
+                  height: 4,
+                ),
+              SizedBox(height: spacing.xl),
+              Expanded(
+                child: _cards.isEmpty
+                    ? _completion(context)
+                    : _card(context, _cards.first),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // محتوای اصلی (کارت لایتنر یا صفحه اتمام)
-            Expanded(
-              child: _cards.isEmpty
-                  ? _buildCompletionScreen()
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(() => _showTranslation = !_showTranslation),
-                          child: Container(
-                            padding: const EdgeInsets.all(24),
-                            width: double.infinity,
-                            height: 260,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1A1A1A),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFFFCC00)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // لیبل درس مربوطه روی کارت
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white10,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _cards[0]['lesson'] ?? '',
-                                    style: const TextStyle(fontSize: 12, color: Colors.white54),
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  _showTranslation ? _cards[0]['fa']! : _cards[0]['de']!,
-                                  style: TextStyle(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.bold,
-                                    color: _showTranslation ? const Color(0xFFFFCC00) : Colors.white,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 12),
-                                if (!_showTranslation)
-                                  IconButton(
-                                    icon: const Icon(Icons.volume_up_rounded, color: Color(0xFFFFCC00), size: 30),
-                                    onPressed: () => AudioHelper.speakDe(_cards[0]['de']!),
-                                  ),
-                                const Spacer(),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          '(برای دیدن معنی روی کارت ضربه بزنید)',
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
-                        ),
-                        const SizedBox(height: 30),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red[900],
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: _markAsNotLearned,
-                                icon: const Icon(Icons.close, color: Colors.white),
-                                label: const Text('بلد نبودم ❌', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green[800],
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: _markAsLearned,
-                                icon: const Icon(Icons.check, color: Colors.white),
-                                label: const Text('بلد بودم ✅', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-            ),
-          ],
+              if (_cards.isNotEmpty) _actions(context),
+              SizedBox(height: spacing.lg),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCompletionScreen() {
+  Widget _card(BuildContext context, _Card card) {
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final noun = parseGermanEntry(card.entry);
+
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: AppCard(
+        onTap: () => setState(() => _revealed = !_revealed),
+        // Review mode owns the violet edge.
+        borderColor: colors.review.withValues(alpha: 0.45),
+        padding: EdgeInsets.symmetric(
+          horizontal: spacing.xl,
+          vertical: spacing.xxl,
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.stars_rounded, size: 90, color: Color(0xFFFFCC00)),
-            const SizedBox(height: 20),
-            const Text(
-              'عالی بود! 🎉',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'تمام $_initialTotal لغت این جلسه را با موفقیت مرور کردی و یاد گرفتی.',
-              style: const TextStyle(color: Colors.grey, fontSize: 15),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFCC00),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            PlateLabel(card.lesson, color: colors.review),
+            SizedBox(height: spacing.xl),
+            if (noun.hasArticle && !_revealed) ...[
+              GenderChip(article: noun.article!),
+              SizedBox(height: spacing.md),
+            ],
+            AnimatedSwitcher(
+              duration: context.motion.resolve(context, context.motion.quick),
+              child: Text(
+                _revealed ? card.translation : noun.word,
+                key: ValueKey(_revealed),
+                style: context.texts.displaySmall,
+                textAlign: TextAlign.center,
+                textDirection:
+                    _revealed ? TextDirection.rtl : TextDirection.ltr,
               ),
-              onPressed: () => _loadCards(),
-              child: const Text('شروع مجدد تمرین', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            SizedBox(height: spacing.lg),
+            if (!_revealed)
+              SpeakButton(text: card.entry, size: 22)
+            else
+              Text(
+                noun.word,
+                style: AppTypography.monoStyle(
+                  color: colors.textTertiary,
+                  size: 13,
+                ),
+              ),
+            SizedBox(height: spacing.md),
+            Text(
+              _revealed ? 'برای برگشت بزن' : 'برای دیدن معنی بزن',
+              style: context.texts.labelSmall,
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _actions(BuildContext context) {
+    final spacing = context.spacing;
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _again,
+            child: const Text('باز هم ببینم'),
+          ),
+        ),
+        SizedBox(width: spacing.sm),
+        Expanded(
+          child: FilledButton(onPressed: _got, child: const Text('بلد بودم')),
+        ),
+      ],
+    );
+  }
+
+  Widget _completion(BuildContext context) {
+    final spacing = context.spacing;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$_known / $_sessionSize', style: context.texts.displaySmall),
+          SizedBox(height: spacing.sm),
+          Text('این دور تمام شد', style: context.texts.titleSmall),
+          SizedBox(height: spacing.xs),
+          Text(
+            'کارت‌ها را دوباره بچین یا درس دیگری را مرور کن.',
+            style: context.texts.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: spacing.xl),
+          FilledButton(onPressed: _load, child: const Text('دور تازه')),
+        ],
+      ),
+    );
+  }
+}
+
+class _Card {
+  const _Card({
+    required this.entry,
+    required this.translation,
+    required this.lesson,
+  });
+
+  final String entry;
+  final String translation;
+  final String lesson;
 }

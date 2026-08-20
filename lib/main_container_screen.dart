@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:deutsch_mate/screens/home/home_screen.dart';
-import 'package:deutsch_mate/screens/learn/learn_screen.dart';
-import 'package:deutsch_mate/screens/practice/practice_screen.dart';
-import 'package:deutsch_mate/screens/progress/progress_screen.dart';
-import 'package:deutsch_mate/screens/profile/profile_screen.dart';
+
+import 'screens/home/home_screen.dart';
+import 'screens/learn/learn_screen.dart';
+import 'screens/practice/practice_screen.dart';
+import 'screens/profile/profile_screen.dart';
+import 'screens/progress/progress_screen.dart';
+import 'theme/app_tokens.dart';
 
 class MainContainerScreen extends StatefulWidget {
   const MainContainerScreen({super.key});
@@ -13,34 +15,62 @@ class MainContainerScreen extends StatefulWidget {
 }
 
 class _MainContainerScreenState extends State<MainContainerScreen> {
-  int _currentIndex = 0;
+  int _index = 0;
 
-  final List<Widget> _pages = [
-    const HomeScreen(),
-    const LearnScreen(),
-    const PracticeScreen(),
-    const ProgressScreen(),
-    const ProfileScreen(),
+  static const _pages = [
+    HomeScreen(),
+    LearnScreen(),
+    PracticeScreen(),
+    ProgressScreen(),
+    ProfileScreen(),
+  ];
+
+  static const _destinations = [
+    (icon: Icons.grid_view_outlined, selected: Icons.grid_view, label: 'خانه'),
+    (
+      icon: Icons.menu_book_outlined,
+      selected: Icons.menu_book,
+      label: 'یادگیری'
+    ),
+    (
+      icon: Icons.track_changes_outlined,
+      selected: Icons.track_changes,
+      label: 'تمرین'
+    ),
+    (
+      icon: Icons.insights_outlined,
+      selected: Icons.insights,
+      label: 'پیشرفت'
+    ),
+    (
+      icon: Icons.person_outline,
+      selected: Icons.person,
+      label: 'پروفایل'
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF141414),
-        selectedItemColor: const Color(0xFFFFCC00),
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'خانه'),
-          BottomNavigationBarItem(icon: Icon(Icons.menu_book_rounded), label: 'یادگیری'),
-          BottomNavigationBarItem(icon: Icon(Icons.sports_esports_rounded), label: 'تمرین'),
-          BottomNavigationBarItem(icon: Icon(Icons.show_chart_rounded), label: 'پیشرفت'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'پروفایل'),
-        ],
+      // IndexedStack keeps each tab's scroll position and exercise state alive
+      // across switches; the previous version rebuilt from scratch every time.
+      body: IndexedStack(index: _index, children: _pages),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: context.colors.hairline)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          destinations: [
+            for (final d in _destinations)
+              NavigationDestination(
+                icon: Icon(d.icon),
+                selectedIcon: Icon(d.selected),
+                label: d.label,
+              ),
+          ],
+        ),
       ),
     );
   }

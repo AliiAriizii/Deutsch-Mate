@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:deutsch_mate/core/constants/app_data.dart'; // حتماً مطمئن شو که فایل AppData در کنار این فایل باشه یا ایمپورت شده باشه
 
+import '../../core/constants/app_data.dart';
+import '../../core/german.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/app_tokens.dart';
+import '../../widgets/primitives.dart';
+import '../../widgets/quiz_widgets.dart';
+import '../../widgets/speak_button.dart';
+import 'lesson_filter.dart';
+
+/// der / die / das drill.
+///
+/// The three answer buttons carry the gender colours, so the colour a learner
+/// picks here is the same colour they saw on the vocabulary row. That is the
+/// whole point of colour-coding gender rather than decorating with it.
 class ArtikelTrainerScreen extends StatefulWidget {
   const ArtikelTrainerScreen({super.key});
 
@@ -9,277 +22,317 @@ class ArtikelTrainerScreen extends StatefulWidget {
 }
 
 class _ArtikelTrainerScreenState extends State<ArtikelTrainerScreen> {
-  int _currentIndex = 0;
-  int _score = 0;
-  String? _feedbackMessage;
-  Color? _feedbackColor;
+  static const _articles = ['der', 'die', 'das'];
 
-  String _selectedLesson = 'Alle'; // گزینه پیش‌فرض: همه درس‌ها
-  List<Map<String, String>> _activeItems = [];
+  int _index = 0;
+  int _score = 0;
+  String? _picked;
+  String _lessonFilter = kAllLessons;
+  List<_ArticleItem> _items = const [];
 
   @override
   void initState() {
     super.initState();
-    _loadItemsForSelectedLesson();
+    _load();
   }
 
-  // استخراج و فیلتر کردن کلمات دارای ارتیکل از AppData
-  void _loadItemsForSelectedLesson() {
-    List<Map<String, String>> extractedItems = [];
+  void _load() {
+    final items = <_ArticleItem>[];
+    for (final lesson in AppData.lessons) {
+      final title = lesson['title']?.toString() ?? '';
+      if (_lessonFilter != kAllLessons && title != _lessonFilter) continue;
 
-    for (var lesson in AppData.lessons) {
-      final title = lesson['title'] as String? ?? '';
-      
-      // اگر درسی خاص انتخاب شده و با این درس یکی نیست، نادیده‌اش بگیر
-      if (_selectedLesson != 'Alle' && title != _selectedLesson) {
-        continue;
-      }
-
-      final words = lesson['words'] as List<dynamic>? ?? [];
-      for (var item in words) {
-        final String wordText = item['word'] ?? '';
-        final String translation = item['translation'] ?? '';
-        final lower = wordText.trim().toLowerCase();
-
-        // چک کردن اینکه آیا کلمه با ارتیکل‌های اصلی شروع میشه یا نه
-        if (lower.startsWith('der ') || lower.startsWith('die ') || lower.startsWith('das ')) {
-          final parts = wordText.trim().split(' ');
-          final article = parts[0].toLowerCase();
-          final noun = parts.sublist(1).join(' ');
-
-          extractedItems.add({
-            'article': article,
-            'noun': noun,
-            'translation': translation,
-            'lesson': title,
-          });
-        }
+      for (final w in (lesson['words'] as List? ?? const [])) {
+        final noun = parseGermanEntry((w['word'] ?? '').toString());
+        if (!noun.hasArticle) continue;
+        items.add(
+          _ArticleItem(
+            article: noun.article!,
+            noun: noun.word,
+            translation: (w['translation'] ?? '').toString(),
+            lesson: title,
+          ),
+        );
       }
     }
-
-    // تصادفی کردن ترتیب کلمات برای تنوع بیشتر
-    extractedItems.shuffle();
+    items.shuffle();
 
     setState(() {
-      _activeItems = extractedItems;
-      _currentIndex = 0;
-      _feedbackMessage = null;
+      _items = items;
+      _index = 0;
+      _picked = null;
     });
   }
 
-  void _checkAnswer(String selectedArticle) {
-    if (_activeItems.isEmpty) return;
-
-    final correctAnswer = _activeItems[_currentIndex]['article'];
+  void _pick(String article) {
+    if (_picked != null) return;
+    final correct = _items[_index].article == article;
     setState(() {
-      if (selectedArticle == correctAnswer) {
-        _score += 10;
-        _feedbackMessage = 'Richtig! ✅ (+10 XP)';
-        _feedbackColor = Colors.greenAccent;
-      } else {
-        _feedbackMessage = 'Falsch! ❌ (Richtig: ${correctAnswer?.toUpperCase()})';
-        _feedbackColor = Colors.redAccent;
-      }
+      _picked = article;
+      if (correct) _score += 10;
     });
+  }
 
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted) return;
-      setState(() {
-        _feedbackMessage = null;
-        if (_currentIndex < _activeItems.length - 1) {
-          _currentIndex++;
-        } else {
-          // دور تمام شد؛ دوباره شافل و از اول
-          _currentIndex = 0;
-          _activeItems.shuffle();
-        }
-      });
+  void _next() {
+    setState(() {
+      _picked = null;
+      if (_index < _items.length - 1) {
+        _index++;
+      } else {
+        _index = 0;
+        _items = List.of(_items)..shuffle();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // لیست عناوین درس‌ها برای Dropdown
-    final List<String> lessonOptions = [
-      'Alle',
-      ...AppData.lessons.map((e) => e['title'] as String),
-    ];
+    final spacing = context.spacing;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Artikel Trainer', style: TextStyle(color: Colors.white)),
-        actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Score: $_score XP',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFFFFCC00),
-                ),
-              ),
-            ),
-          ),
-        ],
+        title: const Text('تمرین آرتیکل'),
+        actions: [ScoreReadout(value: _score, unit: 'XP')],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // بخش انتخاب درس (Lesson Selector)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.gutter),
+          child: _items.isEmpty
+              ? const EmptyState(
+                  title: 'اسمی با آرتیکل در این درس نیست',
+                  action: 'درس دیگری انتخاب کن یا همه درس‌ها را ببین.',
+                  icon: Icons.filter_alt_outlined,
+                )
+              : Column(
+                  children: [
+                    LessonFilter(
+                      value: _lessonFilter,
+                      onChanged: (v) {
+                        _lessonFilter = v;
+                        _load();
+                      },
+                    ),
+                    SizedBox(height: spacing.lg),
+                    Expanded(child: _prompt(context)),
+                    _answerRow(context),
+                    SizedBox(height: spacing.lg),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _prompt(BuildContext context) {
+    final item = _items[_index];
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final revealed = _picked != null;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // The word sits on its own surface rather than floating in the middle
+        // of an empty screen - it is the object of the exercise, so it should
+        // read as an object.
+        AppCard(
+          padding: EdgeInsets.symmetric(
+            horizontal: spacing.xl,
+            vertical: spacing.xxl,
+          ),
+          borderColor: revealed
+              ? colors.forArticle(item.article).withValues(alpha: 0.45)
+              : colors.hairline,
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'انتخاب درس:',
-                    style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  DropdownButton<String>(
-                    value: _selectedLesson,
-                    dropdownColor: const Color(0xFF2A2A2A),
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                    items: lessonOptions.map((String lesson) {
-                      return DropdownMenuItem<String>(
-                        value: lesson,
-                        child: Text(lesson == 'Alle' ? 'همه درس‌ها (Alle)' : lesson),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) {
-                        _selectedLesson = newValue;
-                        _loadItemsForSelectedLesson();
-                      }
-                    },
+                  PlateLabel(item.lesson),
+                  SizedBox(width: spacing.sm),
+                  Text(
+                    '${_index + 1}/${_items.length}',
+                    style: AppTypography.monoStyle(
+                      color: colors.textTertiary,
+                      size: 11,
+                    ),
                   ),
                 ],
               ),
-            ),
-            const Spacer(),
+              SizedBox(height: spacing.xl),
 
-            // کارت نمایش کلمه
-            if (_activeItems.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(30),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // بج نشان‌دهنده درس مربوطه
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _activeItems[_currentIndex]['lesson'] ?? '',
-                        style: const TextStyle(fontSize: 12, color: Colors.white54),
+              // The blank is where the answer lands, and it takes the gender
+              // colour the moment it is revealed.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                textDirection: TextDirection.ltr,
+                children: [
+                  AnimatedSwitcher(
+                    duration:
+                        context.motion.resolve(context, context.motion.quick),
+                    child: Text(
+                      revealed ? item.article : '—',
+                      key: ValueKey(revealed),
+                      style: AppTypography.monoStyle(
+                        color: revealed
+                            ? colors.forArticle(item.article)
+                            : colors.textTertiary,
+                        size: 28,
+                        weight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '___ ${_activeItems[_currentIndex]['noun']}',
-                      style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '(${_activeItems[_currentIndex]['translation']})',
-                      style: const TextStyle(fontSize: 18, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+                  ),
+                  SizedBox(width: spacing.md),
+                  Text(
+                    item.noun,
+                    style: context.texts.displaySmall,
+                    textDirection: TextDirection.ltr,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-
-              // شمارنده کلمات
-              Text(
-                'کلمه ${_currentIndex + 1} از ${_activeItems.length}',
-                style: const TextStyle(color: Colors.white54, fontSize: 14),
-              ),
-            ] else ...[
-              const Center(
-                child: Text(
-                  'هیچ اسم با ارتیکلی در این درس یافت نشد!',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
-              ),
+              SizedBox(height: spacing.sm),
+              Text(item.translation, style: context.texts.bodySmall),
             ],
+          ),
+        ),
 
-            const Spacer(),
+        if (revealed) ...[
+          SizedBox(height: spacing.xl),
+          FeedbackBanner(
+            kind: _picked == item.article
+                ? FeedbackKind.correct
+                : FeedbackKind.wrong,
+            headline: _picked == item.article ? 'Richtig' : 'Falsch',
+            detail: '${item.article} ${item.noun}',
+            trailing: SpeakButton(text: '${item.article} ${item.noun}'),
+          ),
+          SizedBox(height: spacing.lg),
+          FilledButton(onPressed: _next, child: const Text('واژه بعدی')),
+        ],
+      ],
+    );
+  }
 
-            // پیام بازخورد (درست/نادرست)
-            SizedBox(
-              height: 30,
-              child: _feedbackMessage != null
-                  ? Text(
-                      _feedbackMessage!,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _feedbackColor),
-                    )
-                  : null,
+  Widget _answerRow(BuildContext context) {
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final item = _items[_index];
+
+    return Row(
+      children: [
+        for (final article in _articles) ...[
+          if (article != _articles.first) SizedBox(width: spacing.sm),
+          Expanded(
+            child: _ArticleButton(
+              article: article,
+              tint: colors.forArticle(article),
+              // After an answer, the correct option stays lit and the wrong
+              // pick is marked - both are information the learner needs.
+              state: switch (_picked) {
+                null => _ArticleButtonState.idle,
+                _ when article == item.article => _ArticleButtonState.correct,
+                _ when article == _picked => _ArticleButtonState.wrong,
+                _ => _ArticleButtonState.dimmed,
+              },
+              onTap: _picked == null ? () => _pick(article) : null,
             ),
-            const SizedBox(height: 20),
+          ),
+        ],
+      ],
+    );
+  }
+}
 
-            // دکمه‌های DER / DIE / DAS
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildArticleButton('DER', 'der', Colors.blue[800]!),
-                _buildArticleButton('DIE', 'die', Colors.pink[800]!),
-                _buildArticleButton('DAS', 'das', Colors.amber[800]!, textColor: Colors.black),
-              ],
+enum _ArticleButtonState { idle, correct, wrong, dimmed }
+
+class _ArticleButton extends StatelessWidget {
+  const _ArticleButton({
+    required this.article,
+    required this.tint,
+    required this.state,
+    required this.onTap,
+  });
+
+  final String article;
+  final Color tint;
+  final _ArticleButtonState state;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    final (Color fill, Color border, Color text) = switch (state) {
+      _ArticleButtonState.idle => (
+          tint.withValues(alpha: 0.12),
+          tint.withValues(alpha: 0.55),
+          tint,
+        ),
+      _ArticleButtonState.correct => (
+          tint.withValues(alpha: 0.22),
+          tint,
+          tint,
+        ),
+      _ArticleButtonState.wrong => (
+          colors.error.withValues(alpha: 0.12),
+          colors.error,
+          colors.error,
+        ),
+      _ArticleButtonState.dimmed => (
+          colors.card,
+          colors.hairline,
+          colors.textTertiary,
+        ),
+    };
+
+    return AnimatedContainer(
+      duration: context.motion.resolve(context, context.motion.quick),
+      curve: context.motion.curve,
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: context.radii.controlBorder,
+        border: Border.all(
+          color: border,
+          width: state == _ArticleButtonState.correct ? 2 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: context.radii.controlBorder,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: context.radii.controlBorder,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: context.spacing.lg),
+            child: Center(
+              child: Text(
+                article,
+                style: AppTypography.monoStyle(
+                  color: text,
+                  size: 17,
+                  weight: FontWeight.w600,
+                ),
+              ),
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildArticleButton(String label, String value, Color color, {Color textColor = Colors.white}) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onPressed: (_feedbackMessage == null && _activeItems.isNotEmpty)
-              ? () => _checkAnswer(value)
-              : null,
-          child: Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor),
-          ),
-        ),
-      ),
-    );
-  }
+class _ArticleItem {
+  const _ArticleItem({
+    required this.article,
+    required this.noun,
+    required this.translation,
+    required this.lesson,
+  });
+
+  final String article;
+  final String noun;
+  final String translation;
+  final String lesson;
 }
