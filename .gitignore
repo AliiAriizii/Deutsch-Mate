@@ -44,3 +44,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Signing material. The keystore lives outside the repo; this is a backstop so
+# a stray copy or the password file can never be committed.
+**/key.properties
+*.jks
+*.p12
+*.keystore

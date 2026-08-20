@@ -1,5 +1,8 @@
 # Decisions
 
+> Blocker resolutions and the v2 spec conflicts are in
+> [BLOCKERS.md](BLOCKERS.md). Android signing is in [SIGNING.md](SIGNING.md).
+
 Answers to the open questions from the Phase 1 audit. Items marked **you** were
 your call; the rest I decided as asked.
 
