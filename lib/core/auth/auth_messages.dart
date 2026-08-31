@@ -68,7 +68,11 @@ abstract final class AuthMessages {
         'ورود با گوگل روی این نسخه پیکربندی نشده است.',
     'GOOGLE_NO_ID_TOKEN':
         'گوگل توکن شناسایی نداد. پیکربندی serverClientId را بررسی کن.',
-    'GOOGLE_UNSUPPORTED': 'ورود با گوگل روی این دستگاه پشتیبانی نمی‌شود.',
+    // google_sign_in_web returns supportsAuthenticate() == false: Google's
+    // web SDK requires its own rendered button, not a programmatic call.
+    // Say which platform does work rather than leaving a dead end.
+    'GOOGLE_UNSUPPORTED':
+        'ورود با گوگل در نسخه وب کار نمی‌کند. از نسخه اندروید استفاده کن.',
   };
 
   /// Never returns null. An unmapped code still produces a usable sentence

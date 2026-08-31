@@ -231,13 +231,13 @@ class _AuthScreenState extends State<AuthScreen> {
                             // Rules stated before typing, not after failing.
                             helperText: _isLogin
                                 ? null
-                                : 'حداقل ۱۰ نویسه، شامل حرف و رقم',
+                                : 'حداقل 10 نویسه، شامل حرف و رقم',
                           ),
                           validator: (v) {
                             final value = v ?? '';
                             if (value.isEmpty) return 'رمز عبور را وارد کنید';
                             if (_isLogin) return null;
-                            if (value.length < 10) return 'حداقل ۱۰ نویسه';
+                            if (value.length < 10) return 'حداقل 10 نویسه';
                             if (!value.contains(RegExp(r'[A-Za-z]'))) {
                               return 'باید حداقل یک حرف داشته باشد';
                             }
@@ -304,18 +304,8 @@ class _ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
-      padding: EdgeInsets.all(context.spacing.md),
-      decoration: BoxDecoration(
-        color: colors.error.withValues(alpha: 0.10),
-        borderRadius: context.radii.controlBorder,
-        border: BorderDirectional(
-          start: BorderSide(color: colors.error, width: 3),
-          top: BorderSide(color: colors.error.withValues(alpha: 0.3)),
-          bottom: BorderSide(color: colors.error.withValues(alpha: 0.3)),
-          end: BorderSide(color: colors.error.withValues(alpha: 0.3)),
-        ),
-      ),
+    return AccentEdgeBox(
+      tint: colors.error,
       child: Text(
         message,
         style: context.texts.bodySmall?.copyWith(color: colors.error),

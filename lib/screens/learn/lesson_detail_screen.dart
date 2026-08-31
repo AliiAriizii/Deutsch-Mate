@@ -182,38 +182,33 @@ class _SentenceRow extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.only(bottom: spacing.sm),
-      padding: EdgeInsets.all(spacing.md),
-      decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: context.radii.controlBorder,
-        // A leading rule instead of a full border: quieter, and it mirrors.
-        border: BorderDirectional(
-          start: BorderSide(color: colors.accent, width: 2),
-          top: BorderSide(color: colors.hairline),
-          bottom: BorderSide(color: colors.hairline),
-          end: BorderSide(color: colors.hairline),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  german,
-                  style: context.texts.bodyLarge,
-                  textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.start,
-                ),
-                SizedBox(height: spacing.xxs),
-                Text(persian, style: context.texts.bodySmall),
-              ],
+      // A leading rule instead of a full border: quieter, and it mirrors.
+      child: AccentEdgeBox(
+        tint: colors.accent,
+        background: colors.card,
+        barWidth: 2,
+        padding: EdgeInsets.all(spacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    german,
+                    style: context.texts.bodyLarge,
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.start,
+                  ),
+                  SizedBox(height: spacing.xxs),
+                  Text(persian, style: context.texts.bodySmall),
+                ],
+              ),
             ),
-          ),
-          SpeakButton(text: german),
-        ],
+            SpeakButton(text: german),
+          ],
+        ),
       ),
     );
   }
