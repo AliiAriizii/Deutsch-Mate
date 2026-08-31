@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_data.dart';
 import '../../core/german.dart';
+import '../../widgets/progress_scope.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/primitives.dart';
@@ -17,8 +18,10 @@ class ProgressScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
+    final store = ProgressScope.of(context);
     final counts = _genderCounts();
     final total = counts.values.fold(0, (a, b) => a + b);
+    final level = store.levelProgress;
 
     return Scaffold(
       appBar: AppBar(title: const Text('پیشرفت')),
@@ -40,7 +43,7 @@ class ProgressScreen extends StatelessWidget {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      '33',
+                      '${(store.courseFraction * 100).round()}',
                       style: AppTypography.monoStyle(
                         color: context.colors.accentSoft,
                         size: 32,
@@ -50,11 +53,14 @@ class ProgressScreen extends StatelessWidget {
                     SizedBox(width: spacing.xs),
                     Text('%', style: context.texts.titleMedium),
                     const Spacer(),
-                    Text('4 از 12 درس', style: context.texts.labelSmall),
+                    Text(
+                      '${store.completedLektionen} از ${store.plans.length} درس',
+                      style: context.texts.labelSmall,
+                    ),
                   ],
                 ),
                 SizedBox(height: spacing.md),
-                const AppProgressBar(value: 4 / 12),
+                AppProgressBar(value: store.courseFraction),
               ],
             ),
           ),
@@ -86,10 +92,50 @@ class ProgressScreen extends StatelessWidget {
           ),
           SizedBox(height: spacing.xl),
 
-          SectionHeader(title: 'مهارت‌ها', eyebrow: 'برآورد'),
-          const _SkillRow(label: 'واژگان', value: 0.85),
-          const _SkillRow(label: 'گرامر', value: 0.74),
-          const _SkillRow(label: 'شنیدن', value: 0.80),
+          SectionHeader(title: 'XP و سطح', eyebrow: 'تلاش'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'سطح ${level.level}',
+                        style: context.texts.titleSmall,
+                      ),
+                    ),
+                    Text(
+                      '${store.stats.totalXp} XP',
+                      style: AppTypography.monoStyle(
+                        color: context.colors.accentSoft,
+                        size: 15,
+                        weight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: spacing.md),
+                AppProgressBar(value: level.fraction),
+                SizedBox(height: spacing.sm),
+                Text(
+                  '${level.into} از ${level.needed} XP تا سطح بعد',
+                  style: context.texts.labelSmall,
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: spacing.xl),
+
+          SectionHeader(title: 'مهارت‌ها', eyebrow: 'هنوز اندازه‌گیری نمی‌شود'),
+          AppCard(
+            background: context.colors.surface,
+            child: Text(
+              'تفکیک مهارت‌ها به سابقه پاسخ‌های هر واژه نیاز دارد که هنوز ذخیره '
+              'نمی‌شود. تا آن زمان عددی نشان نمی‌دهیم؛ اعداد قبلی ثابت و ساختگی بودند.',
+              style: context.texts.bodySmall,
+            ),
+          ),
         ],
       ),
     );
@@ -148,43 +194,6 @@ class _GenderBar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SkillRow extends StatelessWidget {
-  const _SkillRow({required this.label, required this.value});
-
-  final String label;
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: context.spacing.sm),
-      child: AppCard(
-        padding: EdgeInsets.symmetric(
-          horizontal: context.spacing.lg,
-          vertical: context.spacing.md,
-        ),
-        child: Row(
-          children: [
-            Expanded(child: Text(label, style: context.texts.bodyMedium)),
-            SizedBox(
-              width: 96,
-              child: AppProgressBar(value: value, height: 4),
-            ),
-            SizedBox(width: context.spacing.md),
-            Text(
-              '${(value * 100).round()}%',
-              style: AppTypography.monoStyle(
-                color: context.colors.textSecondary,
-                size: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

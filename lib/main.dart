@@ -7,7 +7,9 @@ import 'core/api/api_client.dart';
 import 'core/auth/auth_api.dart';
 import 'core/auth/auth_controller.dart';
 import 'core/auth/token_store.dart';
+import 'core/progress/progress_store.dart';
 import 'screens/auth/auth_gate.dart';
+import 'widgets/progress_scope.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -17,6 +19,9 @@ Future<void> main() async {
   // Resolved before the first frame so the app never paints the wrong theme
   // and then swaps.
   final theme = await ThemeController.load();
+  // Loaded before the first frame so Home never paints zeroes and then
+  // corrects itself.
+  final progress = await ProgressStore.load();
 
   final auth = AuthController(
     api: AuthApi(ApiClient()),
@@ -26,7 +31,13 @@ Future<void> main() async {
   // delays the first real screen rather than the first frame.
   unawaited(auth.bootstrap());
 
-  runApp(DeutschMateApp(themeController: theme, authController: auth));
+  runApp(
+    DeutschMateApp(
+      themeController: theme,
+      authController: auth,
+      progressStore: progress,
+    ),
+  );
 }
 
 class DeutschMateApp extends StatelessWidget {
@@ -34,11 +45,16 @@ class DeutschMateApp extends StatelessWidget {
     super.key,
     this.themeController,
     this.authController,
+    this.progressStore,
   });
 
   /// Optional so tests and previews can construct the app without async setup.
   final ThemeController? themeController;
   final AuthController? authController;
+
+  /// Optional so tests can build the app without async setup; screens that
+  /// need it are only reachable once signed in.
+  final ProgressStore? progressStore;
 
   @override
   Widget build(BuildContext context) {
@@ -73,10 +89,16 @@ class DeutschMateApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
 
-      builder: (context, child) => ThemeScope(
-        controller: controller,
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) {
+        final body = ThemeScope(
+          controller: controller,
+          child: child ?? const SizedBox.shrink(),
+        );
+        final progress = progressStore;
+        return progress == null
+            ? body
+            : ProgressScope(store: progress, child: body);
+      },
 
       home: authController == null
           ? const _NoSessionPlaceholder()
