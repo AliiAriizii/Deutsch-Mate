@@ -32,6 +32,20 @@ class ErrorCode(StrEnum):
     AUTH_REFRESH_EXPIRED = "AUTH_REFRESH_EXPIRED"
     AUTH_REFRESH_REVOKED = "AUTH_REFRESH_REVOKED"
 
+    # --- auth: federated sign-in ---
+    AUTH_PROVIDER_NOT_CONFIGURED = "AUTH_PROVIDER_NOT_CONFIGURED"
+    AUTH_PROVIDER_UNAVAILABLE = "AUTH_PROVIDER_UNAVAILABLE"
+    # The email already has a password account. Linking requires proving
+    # ownership of it, or an attacker who controls a matching Google address
+    # could take over the account.
+    AUTH_LINK_REQUIRES_PASSWORD = "AUTH_LINK_REQUIRES_PASSWORD"
+    AUTH_PROVIDER_EMAIL_UNVERIFIED = "AUTH_PROVIDER_EMAIL_UNVERIFIED"
+    # The account exists but has no password - it was created through a
+    # provider. Telling the user which one leaks nothing that signup's
+    # AUTH_EMAIL_TAKEN does not already reveal, and without it they would face
+    # a permanently "wrong" password.
+    AUTH_USE_PROVIDER_SIGNIN = "AUTH_USE_PROVIDER_SIGNIN"
+
     # --- auth: one-time tokens ---
     AUTH_VERIFY_TOKEN_INVALID = "AUTH_VERIFY_TOKEN_INVALID"
     AUTH_VERIFY_TOKEN_EXPIRED = "AUTH_VERIFY_TOKEN_EXPIRED"

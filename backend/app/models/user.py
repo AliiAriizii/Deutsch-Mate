@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from pymongo import ASCENDING, IndexModel
 
 from ..security import now
-from .enums import CefrLevel, InterfaceLanguage, UserStatus
+from .enums import AuthProvider, CefrLevel, InterfaceLanguage, UserStatus
 
 
 class OnboardingProfile(BaseModel):
@@ -23,18 +23,39 @@ class OnboardingProfile(BaseModel):
     completed_at: datetime | None = None
 
 
+class FederatedIdentity(BaseModel):
+    """One provider account bound to this user.
+
+    Keyed on `subject` - the provider's stable id for the person - never on the
+    email address. Apple's "Hide My Email" hands out a relay address that can
+    differ from the real one, and Google addresses can be reassigned inside a
+    Workspace domain; the subject is the only thing that does not move.
+    """
+
+    provider: AuthProvider
+    subject: str
+    email: str | None = None
+    linked_at: datetime = Field(default_factory=now)
+
+
 class User(Document):
     # `email` keeps the address as typed; `email_key` is the lowercased form and
     # carries the unique index, so Foo@x.com and foo@x.com cannot both exist.
     email: EmailStr
     email_key: str
-    password_hash: str
+    # None for accounts created purely through a provider - there is no
+    # password to verify, and a blank string would be a silent auth bypass.
+    password_hash: str | None = None
     display_name: str
     phone: str | None = None
 
     email_verified: bool = False
     email_verified_at: datetime | None = None
     status: UserStatus = UserStatus.ACTIVE
+
+    # Every way this person can sign in. A password-only account has an empty
+    # list; a Google-only account has no password_hash.
+    identities: list[FederatedIdentity] = Field(default_factory=list)
 
     onboarding: OnboardingProfile = Field(default_factory=OnboardingProfile)
 
@@ -55,11 +76,22 @@ class User(Document):
         indexes = [
             IndexModel([("email_key", ASCENDING)], unique=True, name="uq_email_key"),
             IndexModel([("status", ASCENDING)], name="ix_status"),
+            IndexModel(
+                [("identities.provider", ASCENDING), ("identities.subject", ASCENDING)],
+                name="ix_identity",
+            ),
         ]
 
     @staticmethod
     def normalize_email(email: str) -> str:
         return email.strip().lower()
+
+    def identity_for(self, provider: AuthProvider) -> FederatedIdentity | None:
+        return next((i for i in self.identities if i.provider is provider), None)
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.password_hash)
 
     @property
     def is_locked(self) -> bool:

@@ -29,11 +29,11 @@ from ..errors import (
     Unauthorized,
 )
 from ..mail import send_password_reset_email, send_verification_email
-from ..models.enums import TokenPurpose, UserStatus
+from ..models.enums import AuthProvider, TokenPurpose, UserStatus
 from ..models.progress import ExerciseAttempt, LektionProgress, UserStats
 from ..models.session import RefreshSession
 from ..models.token import OneTimeToken
-from ..models.user import OnboardingProfile, User
+from ..models.user import FederatedIdentity, OnboardingProfile, User
 from ..schemas.auth import (
     AuthResult,
     ChangePasswordRequest,
@@ -46,13 +46,17 @@ from ..schemas.auth import (
     PasswordPolicyOut,
     RefreshRequest,
     ResendVerificationRequest,
+    ProviderLinkRequest,
+    ProviderSignInRequest,
     ResetPasswordRequest,
     SignInRequest,
     SignUpRequest,
     TokenPair,
+    IdentityOut,
     UserOut,
     VerifyEmailRequest,
 )
+from ..services.oauth import FederatedClaims, verify_google_id_token
 from ..security import (
     create_access_token,
     generate_numeric_code,
@@ -93,6 +97,11 @@ def _user_out(user: User) -> UserOut:
         placement_level=user.placement_level,
         created_at=user.created_at,
         last_login_at=user.last_login_at,
+        identities=[
+            IdentityOut(provider=i.provider.value, email=i.email)
+            for i in user.identities
+        ],
+        has_password=user.has_password,
     )
 
 
@@ -307,6 +316,15 @@ async def sign_in(body: SignInRequest, request: Request) -> AuthResult:
             "This account is disabled.", code=ErrorCode.AUTH_ACCOUNT_DISABLED
         )
 
+    if not user.has_password:
+        # Created through Google/Apple: there is no password to check, and
+        # comparing against None would be an error rather than a rejection.
+        raise Unauthorized(
+            "This account signs in with a provider.",
+            code=ErrorCode.AUTH_USE_PROVIDER_SIGNIN,
+            details={"providers": [i.provider.value for i in user.identities]},
+        )
+
     if not verify_password(body.password, user.password_hash):
         user.failed_login_count += 1
         if user.failed_login_count >= settings.max_failed_logins:
@@ -409,6 +427,183 @@ async def logout(body: LogoutRequest, user: CurrentUser) -> MessageOut:
 
 
 # --------------------------------------------------------------------------- #
+# federated sign-in
+# --------------------------------------------------------------------------- #
+
+
+async def _find_by_identity(claims: FederatedClaims) -> User | None:
+    provider = AuthProvider(claims.provider)
+    return await User.find_one(
+        {"identities.provider": provider.value, "identities.subject": claims.subject}
+    )
+
+
+async def _attach_identity(user: User, claims: FederatedClaims) -> None:
+    if user.identity_for(AuthProvider(claims.provider)) is not None:
+        return
+    user.identities.append(
+        FederatedIdentity(
+            provider=AuthProvider(claims.provider),
+            subject=claims.subject,
+            email=claims.email,
+        )
+    )
+    user.touch()
+    await user.save()
+
+
+async def _complete_provider_signin(
+    user: User, claims: FederatedClaims, request: Request, device_id: str | None
+) -> AuthResult:
+    # A provider that asserts a verified address is at least as good as our own
+    # emailed link, so an account created this way starts verified.
+    if claims.email_verified and not user.email_verified:
+        user.email_verified = True
+        user.email_verified_at = now()
+
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.last_login_at = now()
+    user.touch()
+    await user.save()
+
+    tokens = await _issue_tokens(user, request=request, device_id=device_id)
+    return AuthResult(user=_user_out(user), tokens=tokens)
+
+
+@router.post("/oauth/google", response_model=AuthResult)
+async def google_sign_in(body: ProviderSignInRequest, request: Request) -> AuthResult:
+    """Sign in or sign up with Google.
+
+    Account rule: **one account per verified email address, however you got in.**
+    The four cases, in the order they are checked:
+
+    1. This Google identity is already linked -> sign in.
+    2. No account for the address -> create one, pre-verified.
+    3. An account exists and is provider-only -> link and sign in; both sides
+       were verified by providers, so there is nothing further to prove.
+    4. An account exists **with a password** -> refuse, and ask for the password
+       via /auth/oauth/google/link. Linking automatically here would let anyone
+       able to obtain a Google account for that address take over the account.
+    """
+    claims = verify_google_id_token(body.id_token, raw_nonce=body.nonce)
+
+    existing = await _find_by_identity(claims)
+    if existing is not None:
+        if existing.status is not UserStatus.ACTIVE:
+            raise Unauthorized(
+                "This account is disabled.", code=ErrorCode.AUTH_ACCOUNT_DISABLED
+            )
+        return await _complete_provider_signin(
+            existing, claims, request, body.device_id
+        )
+
+    if not claims.email or not claims.email_verified:
+        # Without a verified address there is no safe way to decide whether this
+        # is a new person or an existing one.
+        raise Unauthorized(
+            "Your Google account has no verified email address.",
+            code=ErrorCode.AUTH_PROVIDER_EMAIL_UNVERIFIED,
+        )
+
+    by_email = await User.find_one(User.email_key == claims.email)
+
+    if by_email is None:
+        user = User(
+            email=claims.email,
+            email_key=claims.email,
+            password_hash=None,
+            display_name=claims.display_name or claims.email.split("@")[0],
+            email_verified=True,
+            email_verified_at=now(),
+            identities=[
+                FederatedIdentity(
+                    provider=AuthProvider.GOOGLE,
+                    subject=claims.subject,
+                    email=claims.email,
+                )
+            ],
+        )
+        try:
+            await user.insert()
+        except DuplicateKeyError:
+            # Raced against another sign-in for the same address; the other one
+            # won, so continue with it rather than failing the user.
+            raced = await User.find_one(User.email_key == claims.email)
+            if raced is None:
+                raise
+            user = raced
+            await _attach_identity(user, claims)
+        else:
+            await UserStats(user_id=user.id).insert()
+        return await _complete_provider_signin(user, claims, request, body.device_id)
+
+    if by_email.status is not UserStatus.ACTIVE:
+        raise Unauthorized(
+            "This account is disabled.", code=ErrorCode.AUTH_ACCOUNT_DISABLED
+        )
+
+    if by_email.has_password:
+        raise Conflict(
+            "An account with this email already uses a password. "
+            "Enter it once to connect Google.",
+            code=ErrorCode.AUTH_LINK_REQUIRES_PASSWORD,
+            details={"email": by_email.email, "provider": "google"},
+        )
+
+    await _attach_identity(by_email, claims)
+    return await _complete_provider_signin(by_email, claims, request, body.device_id)
+
+
+@router.post("/oauth/google/link", response_model=AuthResult)
+async def google_link(body: ProviderLinkRequest, request: Request) -> AuthResult:
+    """Connect Google to an existing password account.
+
+    Proves both sides: a valid Google token for the address, and the password of
+    the account already registered to it.
+    """
+    claims = verify_google_id_token(body.id_token, raw_nonce=body.nonce)
+    if not claims.email or not claims.email_verified:
+        raise Unauthorized(
+            "Your Google account has no verified email address.",
+            code=ErrorCode.AUTH_PROVIDER_EMAIL_UNVERIFIED,
+        )
+
+    user = await User.find_one(User.email_key == claims.email)
+    invalid = Unauthorized(
+        "Email address or password is incorrect.",
+        code=ErrorCode.AUTH_INVALID_CREDENTIALS,
+    )
+    if user is None or not user.has_password:
+        raise invalid
+    if user.is_locked:
+        raise RateLimited(
+            "Too many failed attempts. Try again shortly.",
+            code=ErrorCode.AUTH_ACCOUNT_LOCKED,
+        )
+    if not verify_password(body.password, user.password_hash):
+        user.failed_login_count += 1
+        if user.failed_login_count >= settings.max_failed_logins:
+            user.locked_until = now() + timedelta(minutes=settings.lockout_minutes)
+            user.failed_login_count = 0
+        user.touch()
+        await user.save()
+        raise invalid
+
+    # Guard against binding a second Google account to one user: the identity
+    # list holds at most one entry per provider.
+    already = user.identity_for(AuthProvider.GOOGLE)
+    if already is not None and already.subject != claims.subject:
+        raise Conflict(
+            "A different Google account is already connected to this account.",
+            code=ErrorCode.CONFLICT,
+        )
+
+    await _attach_identity(user, claims)
+    return await _complete_provider_signin(user, claims, request, body.device_id)
+
+
+# --------------------------------------------------------------------------- #
 # password reset / change
 # --------------------------------------------------------------------------- #
 
@@ -493,6 +688,11 @@ async def reset_password(body: ResetPasswordRequest) -> MessageOut:
 
 @router.post("/change-password", response_model=MessageOut)
 async def change_password(body: ChangePasswordRequest, user: CurrentUser) -> MessageOut:
+    if not user.has_password:
+        raise BadRequest(
+            "This account has no password yet. Use the reset flow to set one.",
+            code=ErrorCode.AUTH_USE_PROVIDER_SIGNIN,
+        )
     if not verify_password(body.current_password, user.password_hash):
         raise Unauthorized(
             "Current password is incorrect.", code=ErrorCode.AUTH_INVALID_CREDENTIALS
@@ -547,10 +747,28 @@ async def delete_account(body: DeleteAccountRequest, user: CurrentUser) -> Respo
             "Deletion must be confirmed.",
             details={"fields": {"confirm": "must be true"}},
         )
-    if not verify_password(body.password, user.password_hash):
-        raise Unauthorized(
-            "Password is incorrect.", code=ErrorCode.AUTH_INVALID_CREDENTIALS
-        )
+    # A provider-only account has no password to re-authenticate with. The
+    # access token alone must not be enough to destroy an account, so require
+    # a fresh provider token instead.
+    if user.has_password:
+        if not verify_password(body.password, user.password_hash):
+            raise Unauthorized(
+                "Password is incorrect.", code=ErrorCode.AUTH_INVALID_CREDENTIALS
+            )
+    else:
+        if not body.id_token:
+            raise Unauthorized(
+                "Re-authenticate with your sign-in provider to delete the account.",
+                code=ErrorCode.AUTH_USE_PROVIDER_SIGNIN,
+                details={"providers": [i.provider.value for i in user.identities]},
+            )
+        claims = verify_google_id_token(body.id_token)
+        matching = user.identity_for(AuthProvider.GOOGLE)
+        if matching is None or matching.subject != claims.subject:
+            raise Unauthorized(
+                "That provider account does not match this one.",
+                code=ErrorCode.AUTH_INVALID_CREDENTIALS,
+            )
 
     user_id = user.id
     await RefreshSession.find(RefreshSession.user_id == user_id).delete()

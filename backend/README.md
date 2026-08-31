@@ -73,6 +73,8 @@ All under `/api/v1`.
 | POST | `/auth/forgot-password` | 6-digit code, always reports success |
 | POST | `/auth/reset-password` | Code is salted with the user id, so it cannot be redeemed against another account. Revokes every session |
 | POST | `/auth/change-password` | Requires the current password. Revokes every session |
+| POST | `/auth/oauth/google` | Sign in or sign up with Google. Verifies the ID token against Google's JWKS; the client asserts no identity of its own |
+| POST | `/auth/oauth/google/link` | Connect Google to an existing password account. Requires the password - linking on the token alone would be an account-takeover path |
 | GET | `/auth/me` | |
 | POST | `/auth/onboarding` | Target level, daily goal, interface language. Seeds `placement_level` |
 | DELETE | `/auth/me` | Hard delete + cascade. Requires password re-auth and explicit `confirm` |
@@ -135,16 +137,20 @@ app/
   db.py         Mongo client + Beanie init
   deps.py       bearer auth dependencies
   mail.py       console / SMTP sender
+  services/     federated identity verification (Google, Apple)
   models/       Beanie documents (users, sessions, tokens, progress, content)
   schemas/      request + response models
   routers/      auth, progress, content, health
-tests/          pytest suite (41 tests)
+tests/          pytest suite (63 tests)
 ```
 
 ## Not built yet
 
 - **Content seeding.** No level packages are published; the schema and the
   reference Lektion are Phase 5 work.
+- **Apple Sign-In.** The verifier is written provider-agnostically and
+  `verify_apple_id_token` exists, but no endpoint is wired and iOS is
+  deferred. See docs/BLOCKERS.md.
 - **Placement test.** `placement_level` is settable and seeded from onboarding,
   but there is no item bank or scoring endpoint yet.
 - **Rate limiting** is per-account (failed sign-ins) only. There is no

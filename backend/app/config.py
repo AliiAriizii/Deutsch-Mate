@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # authoring needs no key.
     admin_api_key: str = ""
 
+    # --- Federated sign-in ---
+    # Comma-separated OAuth client ids that may appear as the `aud` of an ID
+    # token. Android, iOS and web each get their own from Google, and all of
+    # them are legitimately us. Empty means the provider is switched off.
+    google_client_ids: str = ""
+    apple_client_ids: str = ""
+
     # --- Auth hardening ---
     max_failed_logins: int = 10
     lockout_minutes: int = 15
@@ -60,6 +67,14 @@ class Settings(BaseSettings):
         if info.data.get("app_env") == "prod" and "CHANGE_ME" in v:
             raise ValueError("JWT_SECRET must be set to a real value when APP_ENV=prod")
         return v
+
+    @property
+    def google_audience_list(self) -> list[str]:
+        return [c.strip() for c in self.google_client_ids.split(",") if c.strip()]
+
+    @property
+    def apple_audience_list(self) -> list[str]:
+        return [c.strip() for c in self.apple_client_ids.split(",") if c.strip()]
 
     @property
     def cors_origin_list(self) -> list[str]:

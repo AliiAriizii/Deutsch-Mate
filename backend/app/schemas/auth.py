@@ -70,11 +70,39 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=1, max_length=256)
 
 
+class ProviderSignInRequest(BaseModel):
+    """An ID token minted by the provider for *this* app.
+
+    The client sends no identity of its own - no email, no user id. Everything
+    we act on is read out of the verified token.
+    """
+
+    id_token: str = Field(min_length=1, max_length=8192)
+    # Raw nonce the client generated for this attempt. The provider echoes its
+    # SHA-256 into the token, which is what stops a token captured elsewhere
+    # from being replayed here.
+    nonce: str | None = Field(default=None, max_length=256)
+    device_id: str | None = Field(default=None, max_length=128)
+
+
+class ProviderLinkRequest(ProviderSignInRequest):
+    """Attaching a provider to an existing password account.
+
+    Requires the password, because the provider token alone only proves control
+    of the provider account - not of the account already registered here.
+    """
+
+    password: str = Field(min_length=1, max_length=256)
+
+
 class DeleteAccountRequest(BaseModel):
     """Store policy requires a real deletion path. Re-auth is required so a
     stolen access token cannot nuke an account."""
 
-    password: str = Field(min_length=1, max_length=256)
+    password: str = Field(default="", max_length=256)
+    # Provider-only accounts have no password to re-authenticate with, so they
+    # prove ownership with a fresh provider token instead.
+    id_token: str | None = Field(default=None, max_length=8192)
     confirm: bool = False
 
 
@@ -99,6 +127,11 @@ class OnboardingOut(BaseModel):
     completed: bool
 
 
+class IdentityOut(BaseModel):
+    provider: str
+    email: str | None
+
+
 class UserOut(BaseModel):
     id: str
     email: EmailStr
@@ -110,6 +143,10 @@ class UserOut(BaseModel):
     placement_level: CefrLevel | None
     created_at: datetime
     last_login_at: datetime | None
+    # What this account can sign in with, so the client can show "connected"
+    # state on the profile screen and refuse to unlink the last method.
+    identities: list[IdentityOut] = []
+    has_password: bool = True
 
 
 class AuthResult(BaseModel):

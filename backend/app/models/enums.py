@@ -82,6 +82,14 @@ class InterfaceLanguage(StrEnum):
     DE = "de"
 
 
+class AuthProvider(StrEnum):
+    """How a person proves who they are. `password` is implicit rather than a
+    stored identity - it is `password_hash` on the user."""
+
+    GOOGLE = "google"
+    APPLE = "apple"
+
+
 class TokenPurpose(StrEnum):
     EMAIL_VERIFY = "email_verify"
     PASSWORD_RESET = "password_reset"
