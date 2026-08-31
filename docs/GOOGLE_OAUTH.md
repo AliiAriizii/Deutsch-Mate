@@ -62,19 +62,18 @@ This client id does two jobs:
 
 Without it there is nothing for the server to verify against.
 
-## 4. Backend configuration
+## 4. Backend configuration — **done**
 
-Put every client id in `backend/.env`, comma separated — Android, web, and
-later iOS are all legitimately this app:
+`backend/.env` holds all three client ids (web, android-debug, android-upload),
+comma separated. Verified loading: 3 audiences, Google sign-in enabled.
 
-```ini
-GOOGLE_CLIENT_IDS=<web-client-id>,<android-debug-client-id>,<android-upload-client-id>
-```
+**No client secret is stored anywhere**, and none is needed: the ID-token flow
+uses the web client *id* as the expected `aud`. A secret would only be required
+for a server-side authorization-code exchange, which this design does not do.
+If one was ever copied into a chat or a file, reset it in the console.
 
-Leaving it empty disables Google sign-in and the endpoint answers
-`AUTH_PROVIDER_NOT_CONFIGURED` — verified by test.
-
-Restart the server. No code changes.
+Leaving `GOOGLE_CLIENT_IDS` empty disables Google sign-in and the endpoint
+answers `AUTH_PROVIDER_NOT_CONFIGURED` — verified by test.
 
 ---
 
@@ -141,16 +140,50 @@ real verification path runs without touching Google. The forgery cases:
 
 ---
 
-## Then the client
+## The client — built
 
-Not built yet, and deliberately: it cannot be verified end to end without the
-real client IDs from the steps above. Once you paste them in, the client work is
+| Piece | Where |
+|---|---|
+| HTTP + typed errors | `lib/core/api/api_client.dart` |
+| Token pair in the keystore | `lib/core/auth/token_store.dart` |
+| Endpoint methods | `lib/core/auth/auth_api.dart` |
+| Session state machine | `lib/core/auth/auth_controller.dart` |
+| `error.code` → Persian | `lib/core/auth/auth_messages.dart` |
+| Google flow | `lib/core/auth/google_auth.dart` |
+| Screen routing | `lib/screens/auth/auth_gate.dart` |
 
-1. `google_sign_in: ^7.x` — note v7 changed the API to
-   `GoogleSignIn.instance` / `initialize()` / `authenticate()`; v6 tutorials
-   will not compile.
-2. `flutter_secure_storage` for the token pair (currently the app still uses the
-   `SharedPreferences` stub that accepts any password).
-3. An API client for the endpoints above, with the `error.code` → Persian
-   message map.
-4. The "Continue with Google" button, and the link prompt for the 409 case.
+Notes worth keeping:
+
+- **The app no longer accepts any password.** The `SharedPreferences` stub is
+  gone; credentials are verified server-side.
+- `serverClientId` is the **web** client id even on Android — that is what makes
+  Google mint an ID token rather than only an access token. Wrong or missing, and
+  `authentication.idToken` is null, which the client reports as
+  `GOOGLE_NO_ID_TOKEN` rather than a generic failure.
+- In google_sign_in 7.x the **nonce is set in `initialize()`**, not
+  `authenticate()`, so a per-attempt nonce means re-initialising per attempt.
+  `attemptLightweightAuthentication()` also returns a *nullable Future*.
+- The base URL defaults to `10.0.2.2:8000` on Android — the host loopback as
+  seen from an emulator. `127.0.0.1` from inside the emulator reaches the
+  emulator itself. Override with
+  `--dart-define=API_BASE_URL=http://<lan-ip>:8000` for a physical device.
+- Android 9+ blocks cleartext HTTP. `android/app/src/debug/` permits it for
+  loopback addresses **only**, and the release manifest has no such permission,
+  so a production build cannot silently talk plain HTTP.
+
+## What still needs a device
+
+The Google button itself. Everything after the token — verification, linking,
+storage, routing — is covered by 22 backend and 17 client tests, but obtaining a
+real ID token needs a signed-in Google account on a real Android device or
+emulator. To try it:
+
+```bash
+# terminal 1
+cd backend && .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
+# terminal 2
+flutter run          # on an emulator or device
+```
+
+Expect the debug SHA-1 to be the one that matters there. If sign-in fails with a
+configuration error, that fingerprint is the first thing to check.

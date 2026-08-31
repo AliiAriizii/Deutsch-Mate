@@ -21,6 +21,12 @@ dependencies:
   # androidx.annotation-experimental:1.4.0 requires compileSdk 34+, so the
   # Android build cannot be configured at all on 3.x.
   flutter_tts: ^4.2.5
+  # Tokens must not sit in SharedPreferences - Keystore/Keychain instead.
+  flutter_secure_storage: ^9.2.4
+  google_sign_in: ^7.0.0
+  http: ^1.2.0
+  # SHA-256 for the sign-in nonce, which Google echoes hashed.
+  crypto: ^3.0.0
 
 dev_dependencies:
   flutter_test:

@@ -1,24 +1,44 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'screens/auth/auth_screen.dart';
+import 'core/api/api_client.dart';
+import 'core/auth/auth_api.dart';
+import 'core/auth/auth_controller.dart';
+import 'core/auth/token_store.dart';
+import 'screens/auth/auth_gate.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   // Resolved before the first frame so the app never paints the wrong theme
   // and then swaps.
   final theme = await ThemeController.load();
-  runApp(DeutschMateApp(themeController: theme));
+
+  final auth = AuthController(
+    api: AuthApi(ApiClient()),
+    tokenStore: SecureTokenStore(),
+  );
+  // Not awaited: the gate shows a splash while this runs, so a slow network
+  // delays the first real screen rather than the first frame.
+  unawaited(auth.bootstrap());
+
+  runApp(DeutschMateApp(themeController: theme, authController: auth));
 }
 
 class DeutschMateApp extends StatelessWidget {
-  const DeutschMateApp({super.key, this.themeController});
+  const DeutschMateApp({
+    super.key,
+    this.themeController,
+    this.authController,
+  });
 
-  /// Optional so tests and previews can construct the app without async setup;
-  /// they get the dark default.
+  /// Optional so tests and previews can construct the app without async setup.
   final ThemeController? themeController;
+  final AuthController? authController;
 
   @override
   Widget build(BuildContext context) {
@@ -53,16 +73,26 @@ class DeutschMateApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
 
-      // Exposed to the settings screen without a state-management package for
-      // the single value that needs it.
       builder: (context, child) => ThemeScope(
         controller: controller,
         child: child ?? const SizedBox.shrink(),
       ),
 
-      home: const AuthScreen(),
+      home: authController == null
+          ? const _NoSessionPlaceholder()
+          : AuthGate(controller: authController!),
     );
   }
+}
+
+/// Only reachable from tests and previews that build the app without wiring a
+/// controller. Says so plainly rather than pretending to be a real screen.
+class _NoSessionPlaceholder extends StatelessWidget {
+  const _NoSessionPlaceholder();
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: Text('DeutschMate')));
 }
 
 /// Makes the [ThemeController] reachable from the profile screen.
