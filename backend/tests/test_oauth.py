@@ -24,6 +24,9 @@ from .conftest import API, GOOD_PASSWORD, MailSpy, auth_header, signup, signup_a
 
 pytestmark = pytest.mark.asyncio
 
+# Grabbed at import time, before the autouse fixture swaps it out.
+_REAL_SIGNING_KEY = oauth._signing_key
+
 WEB_CLIENT_ID = "111-web.apps.googleusercontent.com"
 ANDROID_CLIENT_ID = "111-android.apps.googleusercontent.com"
 
@@ -442,3 +445,62 @@ async def test_deleting_with_another_persons_google_token_is_refused(
     )
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "AUTH_INVALID_CREDENTIALS"
+
+
+# --------------------------------------------------------------------------- #
+# the real key-resolution path
+#
+# Every test above monkeypatches _signing_key, which is what let a bug through:
+# a malformed token raises a PyJWT decode error inside
+# get_signing_key_from_jwt, that was not caught, and the endpoint answered 500.
+# These exercise the genuine function with no patching.
+# --------------------------------------------------------------------------- #
+
+
+async def test_a_malformed_token_is_401_not_500(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Garbage in the id_token field must not crash the endpoint.
+
+    This is exactly what a curl probe sent, and it returned Internal Server
+    Error before the fix.
+    """
+    monkeypatch.setattr(oauth, "_signing_key", _REAL_SIGNING_KEY)
+
+    for junk in ["not-a-real-token", "", "a.b", "....", "Bearer something"]:
+        resp = await client.post(
+            f"{API}/auth/oauth/google", json={"id_token": junk or "x"}
+        )
+        assert resp.status_code == 401, f"{junk!r} produced {resp.status_code}"
+        assert resp.json()["error"]["code"] in {
+            "AUTH_TOKEN_INVALID",
+            "AUTH_PROVIDER_UNAVAILABLE",
+        }
+
+
+async def test_a_token_with_an_unknown_kid_is_401_not_500(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    signing_key: rsa.RSAPrivateKey,
+) -> None:
+    """Structurally valid, signed by a key Google never published."""
+    monkeypatch.setattr(oauth, "_signing_key", _REAL_SIGNING_KEY)
+
+    token = jwt.encode(
+        {"iss": "https://accounts.google.com", "aud": WEB_CLIENT_ID, "sub": "x",
+         "iat": int(time.time()), "exp": int(time.time()) + 600},
+        signing_key,
+        algorithm="RS256",
+        headers={"kid": "a-kid-google-never-issued"},
+    )
+
+    # This one reaches Google's JWKS endpoint for real, so it accepts either
+    # verdict: TOKEN_INVALID when the fetch succeeds and the kid is absent,
+    # PROVIDER_UNAVAILABLE when the machine is offline. Both are 401, which is
+    # the property under test.
+    resp = await client.post(f"{API}/auth/oauth/google", json={"id_token": token})
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] in {
+        "AUTH_TOKEN_INVALID",
+        "AUTH_PROVIDER_UNAVAILABLE",
+    }

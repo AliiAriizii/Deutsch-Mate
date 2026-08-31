@@ -80,6 +80,16 @@ def reset_jwks_cache() -> None:
 
 
 def _signing_key(jwks_url: str, token: str) -> Any:
+    """Resolve the provider key that signed this token.
+
+    Two failure modes with different meanings, and they must not be conflated:
+    a malformed token is the caller's fault (401 invalid), while an unreachable
+    JWKS endpoint is ours (401 provider-unavailable, retryable).
+
+    `get_signing_key_from_jwt` parses the token header *before* it fetches
+    anything, so garbage input raises a PyJWT decode error rather than a JWKS
+    error. Leaving that uncaught turned any malformed token into a 500.
+    """
     try:
         return _jwks.client(jwks_url).get_signing_key_from_jwt(token).key
     except (jwt.PyJWKClientError, httpx.HTTPError, OSError) as exc:
@@ -89,6 +99,12 @@ def _signing_key(jwks_url: str, token: str) -> Any:
         raise Unauthorized(
             "Could not reach the sign-in provider. Try again.",
             code=ErrorCode.AUTH_PROVIDER_UNAVAILABLE,
+        ) from exc
+    except jwt.PyJWTError as exc:
+        # Unparseable token, missing kid, unsupported alg - all "this is not a
+        # token we can use", not a server fault.
+        raise Unauthorized(
+            "Sign-in token is not valid.", code=ErrorCode.AUTH_TOKEN_INVALID
         ) from exc
 
 
