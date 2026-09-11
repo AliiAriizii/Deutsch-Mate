@@ -10,11 +10,11 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .db import connect, disconnect
+from .db import connect, disconnect, ensure_db
 from .errors import register_error_handlers
 from .routers import auth, content, health, progress
 
@@ -33,6 +33,12 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         await disconnect()
+
+
+# Serverless hosts do not reliably run the lifespan handler above, so every
+# route that touches Mongo connects on first use instead. Health is left out
+# on purpose: it has to answer even when the database is unreachable.
+requires_db = Depends(ensure_db)
 
 
 def create_app() -> FastAPI:
@@ -58,9 +64,9 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
 
     app.include_router(health.router, prefix=API_PREFIX)
-    app.include_router(auth.router, prefix=API_PREFIX)
-    app.include_router(progress.router, prefix=API_PREFIX)
-    app.include_router(content.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX, dependencies=[requires_db])
+    app.include_router(progress.router, prefix=API_PREFIX, dependencies=[requires_db])
+    app.include_router(content.router, prefix=API_PREFIX, dependencies=[requires_db])
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict[str, str]:

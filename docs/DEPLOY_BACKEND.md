@@ -13,12 +13,14 @@ process, and nothing survives between invocations. Four consequences here:
 
 1. **`init_beanie` runs in a lifespan handler.** Vercel's Python adapter does
    not reliably run ASGI lifespan events, so the app can start with no document
-   models registered and every route 500s. This has to move to a lazy,
-   idempotent init on first use.
+   models registered and every route 500s. This is now handled by a lazy,
+   idempotent init on first use (`app.db.ensure_db`).
 2. **MongoDB connections do not pool across invocations.** Each cold start opens
-   a new connection. A busy serverless app will exhaust an Atlas free tier's
-   connection limit (500 on M0) far sooner than you would expect. The fix is a
-   module-level cached client plus `maxPoolSize=1`.
+   a new connection, and every live instance holds its own pool, so a busy
+   deployment can exhaust an Atlas free tier's connection limit (500 on M0)
+   faster than you would expect. `settings.mongo_max_pool_size` drops the pool
+   to 5 when `VERCEL` is set. Not 1: Fluid Compute serves several concurrent
+   requests per instance, so a pool of one would serialise every query.
 3. **Your local `mongod` is unreachable** from Vercel. You need **MongoDB
    Atlas** (or another hosted Mongo) regardless of which host you pick.
 4. **Cold starts.** `cryptography` + `pymongo` + `fastapi` is a chunky bundle;
@@ -45,6 +47,8 @@ The code below is needed **only for Vercel**.
 
 ## If you do want Vercel
 
+The code side is already done and committed. What is left is the dashboard.
+
 ### 1. The monorepo is not a problem
 
 Vercel takes a **Root Directory** setting. Point the project at `backend/` and
@@ -52,48 +56,25 @@ it ignores the `frontend/` Flutter app entirely.
 
 Project settings → General → Root Directory → `backend`.
 
-### 2. Add the function entrypoint
+### 2. What is already in the repo
 
-Vercel looks for `api/index.py` and serves the ASGI app it finds there.
+| File | Purpose |
+|---|---|
+| `backend/api/index.py` | The function entrypoint. Vercel serves the ASGI callable it finds here |
+| `backend/vercel.json` | Rewrites every path to that one function; FastAPI routes internally |
+| `backend/.python-version` | Pins Python 3.13, which `requirements.txt` is resolved against |
+| `backend/.vercelignore` | Keeps tests and dev requirements out of the bundle |
 
-```python
-# backend/api/index.py
-from app.main import app  # noqa: F401  - Vercel serves this ASGI callable
-```
+`app/db.py` gained `ensure_db()`: an idempotent connect-on-first-use guarded by
+an `asyncio.Lock`, so concurrent requests on a cold instance open one client
+between them. `app/main.py` attaches it as a dependency on the auth, progress
+and content routers. Health is deliberately excluded — it has to answer even
+when Mongo is unreachable, and it reports the failure in its body instead.
 
-### 3. `vercel.json`
+The lifespan handler is untouched, so a local `uvicorn` run still connects at
+startup and `ensure_db()` is a no-op there.
 
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
-}
-```
-
-Every path routes to the one function; FastAPI does its own routing inside.
-
-### 4. Make Mongo init lazy
-
-This is the change that matters. Today `app/main.py` connects in a lifespan
-handler. Under Vercel it must connect on first use and cache the client at
-module scope, so warm invocations reuse it:
-
-```python
-_ready = False
-
-async def ensure_db() -> None:
-    global _ready
-    if _ready:
-        return
-    await connect()          # init_beanie, cached AsyncMongoClient
-    _ready = True
-```
-
-…called from a dependency on every router, or from middleware. Also set
-`maxPoolSize=1` on the client, since each instance serves one request at a
-time and a large pool per instance multiplies connections for nothing.
-
-### 5. Environment variables
+### 3. Environment variables
 
 Set in Vercel project settings, not in a file:
 
@@ -117,14 +98,14 @@ Two that will bite:
 - `APP_ENV=prod` makes the app **refuse to start** with the placeholder
   `JWT_SECRET`. That guard is deliberate.
 
-### 6. Atlas network access
+### 4. Atlas network access
 
 Vercel functions have no fixed egress IPs on the Hobby plan, so Atlas must
 allow `0.0.0.0/0` and you are relying entirely on credentials. That is another
 reason a fixed-IP host is a better fit. Use a strong database password and a
 user scoped to the one database.
 
-### 7. Point the app at it
+### 5. Point the app at it
 
 ```bash
 cd frontend

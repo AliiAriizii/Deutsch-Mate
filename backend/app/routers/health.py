@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ..config import settings
-from ..db import client
+from ..db import client, ensure_db
 from ..security import now
 
 router = APIRouter(tags=["health"])
@@ -18,6 +18,7 @@ async def health() -> dict[str, object]:
     mongo_ok = True
     mongo_error: str | None = None
     try:
+        await ensure_db()
         await client().admin.command("ping")
     except Exception as exc:  # surfaced, not swallowed
         mongo_ok = False
