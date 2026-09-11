@@ -48,7 +48,7 @@ The code below is needed **only for Vercel**.
 ### 1. The monorepo is not a problem
 
 Vercel takes a **Root Directory** setting. Point the project at `backend/` and
-it ignores the Flutter app entirely. Nothing needs to move.
+it ignores the `frontend/` Flutter app entirely.
 
 Project settings → General → Root Directory → `backend`.
 
@@ -127,6 +127,7 @@ user scoped to the one database.
 ### 7. Point the app at it
 
 ```bash
+cd frontend
 flutter build apk --release --dart-define=API_BASE_URL=https://<project>.vercel.app
 ```
 

@@ -62,10 +62,24 @@ The application features an **offline-first architecture**, meaning learners can
 
 ```
 Deutsch-Mate/
-├── lib/                    # Flutter app source code
-│   ├── core/              # Core utilities (audio, audio_helper, etc.)
-│   └── ...
-├── backend/               # FastAPI backend service
+├── frontend/                   # Flutter application
+│   ├── lib/                    # Flutter app source code
+│   │   ├── core/              # Core utilities (audio, audio_helper, etc.)
+│   │   └── ...
+│   ├── assets/
+│   │   ├── data/              # Lesson content & vocabulary
+│   │   ├── audio/             # Pronunciation audio files
+│   │   └── fonts/             # Custom fonts
+│   ├── android/               # Android platform code
+│   ├── ios/                   # iOS platform code
+│   ├── web/                   # Web platform code
+│   ├── linux/                 # Linux platform code
+│   ├── macos/                 # macOS platform code
+│   ├── windows/               # Windows platform code
+│   ├── test/                  # Flutter widget & unit tests
+│   ├── pubspec.yaml           # Flutter dependencies & configuration
+│   └── analysis_options.yaml  # Lint rules
+├── backend/                    # FastAPI backend service (deployed to Vercel)
 │   ├── app/
 │   │   ├── config.py      # Settings & configuration
 │   │   ├── errors.py      # Error definitions & handlers
@@ -77,18 +91,7 @@ Deutsch-Mate/
 │   │   ├── schemas/       # Request/response schemas
 │   │   └── routers/       # API endpoints (auth, progress, content)
 │   └── tests/             # Pytest suite (41 tests)
-├── assets/
-│   ├── data/              # Lesson content & vocabulary
-│   ├── audio/             # Pronunciation audio files
-│   └── fonts/             # Custom fonts
-├── android/               # Android platform code
-├── ios/                   # iOS platform code
-├── web/                   # Web platform code
-├── linux/                 # Linux platform code
-├── macos/                 # macOS platform code
-├── windows/               # Windows platform code
-├── pubspec.yaml           # Flutter dependencies & configuration
-└── analysis_options.yaml  # Lint rules
+└── docs/                       # Setup, deployment and decision records
 
 ```
 
@@ -109,8 +112,10 @@ Deutsch-Mate/
 1. **Clone the repository**
    ```bash
    git clone https://github.com/AliiAriizii/Deutsch-Mate.git
-   cd Deutsch-Mate
+   cd Deutsch-Mate/frontend
    ```
+
+   Every Flutter command below runs from `frontend/`.
 
 2. **Install Flutter dependencies**
    ```bash
@@ -126,7 +131,7 @@ Deutsch-Mate/
 
 1. **Navigate to backend directory**
    ```bash
-   cd backend
+   cd backend   # from the repository root
    ```
 
 2. **Create a Python virtual environment**
@@ -167,6 +172,8 @@ Deutsch-Mate/
 ## ▶️ Running the Application
 
 ### Frontend
+
+All commands below run from the `frontend/` directory.
 
 **Run on default platform:**
 ```bash
@@ -223,12 +230,13 @@ python -m pytest -k "auth"    # Run specific test pattern
 
 Check for lint and style issues:
 ```bash
+cd frontend
 flutter analyze
 ```
 
 Format code:
 ```bash
-dart format lib/ backend/
+dart format frontend/lib/   # from the repository root
 ```
 
 ### Code Organization

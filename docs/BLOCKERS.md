@@ -244,7 +244,7 @@ every chip, so colour never carries meaning alone.
 
 3.75:1 on `ink800` — below AA for body text, which §11 requires. §11 is the
 harder constraint, so **`#7C889A`** ships. Same for the light equivalent.
-Enforced by `test/theme_contrast_test.dart`.
+Enforced by `frontend/test/theme_contrast_test.dart`.
 
 ## C. XP curve — formula wins
 

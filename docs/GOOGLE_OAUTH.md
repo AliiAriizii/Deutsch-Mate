@@ -144,13 +144,13 @@ real verification path runs without touching Google. The forgery cases:
 
 | Piece | Where |
 |---|---|
-| HTTP + typed errors | `lib/core/api/api_client.dart` |
-| Token pair in the keystore | `lib/core/auth/token_store.dart` |
-| Endpoint methods | `lib/core/auth/auth_api.dart` |
-| Session state machine | `lib/core/auth/auth_controller.dart` |
-| `error.code` → Persian | `lib/core/auth/auth_messages.dart` |
-| Google flow | `lib/core/auth/google_auth.dart` |
-| Screen routing | `lib/screens/auth/auth_gate.dart` |
+| HTTP + typed errors | `frontend/lib/core/api/api_client.dart` |
+| Token pair in the keystore | `frontend/lib/core/auth/token_store.dart` |
+| Endpoint methods | `frontend/lib/core/auth/auth_api.dart` |
+| Session state machine | `frontend/lib/core/auth/auth_controller.dart` |
+| `error.code` → Persian | `frontend/lib/core/auth/auth_messages.dart` |
+| Google flow | `frontend/lib/core/auth/google_auth.dart` |
+| Screen routing | `frontend/lib/screens/auth/auth_gate.dart` |
 
 Notes worth keeping:
 
@@ -167,7 +167,7 @@ Notes worth keeping:
   seen from an emulator. `127.0.0.1` from inside the emulator reaches the
   emulator itself. Override with
   `--dart-define=API_BASE_URL=http://<lan-ip>:8000` for a physical device.
-- Android 9+ blocks cleartext HTTP. `android/app/src/debug/` permits it for
+- Android 9+ blocks cleartext HTTP. `frontend/android/app/src/debug/` permits it for
   loopback addresses **only**, and the release manifest has no such permission,
   so a production build cannot silently talk plain HTTP.
 
@@ -182,7 +182,7 @@ emulator. To try it:
 # terminal 1
 cd backend && .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 # terminal 2
-flutter run          # on an emulator or device
+cd frontend && flutter run          # on an emulator or device
 ```
 
 Expect the debug SHA-1 to be the one that matters there. If sign-in fails with a
