@@ -18,12 +18,14 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+        working-directory: frontend
 
       - name: Build APK
         run: flutter build apk --release
+        working-directory: frontend
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Deutsch-Mate-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: frontend/build/app/outputs/flutter-apk/app-release.apk

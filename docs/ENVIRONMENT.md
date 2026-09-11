@@ -61,7 +61,7 @@ Please enable Developer Mode in your system settings.
 
 Windows only allows non-elevated symlink creation in Developer Mode, and
 Flutter symlinks plugins into the *desktop* platform directories
-(`windows/flutter/ephemeral/.plugin_symlinks`, same for linux/macos).
+(`frontend/windows/flutter/ephemeral/.plugin_symlinks`, same for linux/macos).
 
 **Scope, measured rather than assumed:** this blocks only the Windows and Linux
 desktop targets. Android and web are unaffected — `pub get` still writes
@@ -93,6 +93,7 @@ Or click through: `start ms-settings:developers` → Developer Mode → On.
 
 ```bash
 # Flutter
+cd frontend
 flutter analyze
 flutter test
 flutter build apk --debug

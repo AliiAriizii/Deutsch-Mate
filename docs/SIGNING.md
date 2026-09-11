@@ -8,10 +8,10 @@
 | Format | PKCS12 (the industry standard; `keytool` warns that JKS is proprietary) |
 | Key | RSA 4096, `SHA384withRSA`, alias `upload` |
 | Validity | 30 years, to 2056-08-12 (Play requires validity past 2033) |
-| Password | in `android/key.properties`, which is gitignored |
-| Gradle wiring | `android/app/build.gradle.kts` reads `key.properties`; falls back to debug signing when absent |
+| Password | in `frontend/android/key.properties`, which is gitignored |
+| Gradle wiring | `frontend/android/app/build.gradle.kts` reads `key.properties`; falls back to debug signing when absent |
 
-`android/key.properties` is ignored by both `android/.gitignore` (Flutter's template) and the root `.gitignore`, which also blocks `*.p12`, `*.jks`, `*.keystore` as a backstop. Verified with `git check-ignore`.
+`frontend/android/key.properties` is ignored by both `frontend/android/.gitignore` (Flutter's template) and the root `.gitignore`, which also blocks `*.p12`, `*.jks`, `*.keystore` as a backstop. Verified with `git check-ignore`.
 
 ## Fingerprints
 
@@ -61,11 +61,12 @@ keytool -storepasswd -keystore C:/Users/Banaizade/keystores/deutschmate-upload.p
 keytool -keypasswd  -keystore C:/Users/Banaizade/keystores/deutschmate-upload.p12 -alias upload
 ```
 
-Then update `storePassword` and `keyPassword` in `android/key.properties`. Fingerprints do **not** change — the key material is untouched, so nothing needs re-registering with Google.
+Then update `storePassword` and `keyPassword` in `frontend/android/key.properties`. Fingerprints do **not** change — the key material is untouched, so nothing needs re-registering with Google.
 
 ## Building
 
 ```bash
+cd frontend
 flutter build apk --release        # signed with the upload key
 flutter build appbundle --release  # what Play actually wants
 ```
@@ -77,4 +78,4 @@ Verify which certificate an artifact carries:
   build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Release builds also run R8 with `isMinifyEnabled` and `isShrinkResources`, so `android/app/proguard-rules.pro` keeps the Flutter engine and `flutter_tts` reflective entry points. If a release build crashes where debug does not, that file is the first suspect.
+Release builds also run R8 with `isMinifyEnabled` and `isShrinkResources`, so `frontend/android/app/proguard-rules.pro` keeps the Flutter engine and `flutter_tts` reflective entry points. If a release build crashes where debug does not, that file is the first suspect.

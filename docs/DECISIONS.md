@@ -106,7 +106,7 @@ that names an unknown type fails validation instead of failing at runtime.
 
 **Drift (SQLite).** Hive is unmaintained and Isar is stalled, and the unlock
 logic needs real relational queries over `prerequisiteIds` plus per-exercise
-progress. `hive`/`hive_flutter` get dropped from `pubspec.yaml` — they were
+progress. `hive`/`hive_flutter` get dropped from `frontend/pubspec.yaml` — they were
 declared but never used.
 
 ### G9 — Placement test
@@ -123,8 +123,8 @@ mapping, which is content work, and gating v1 on it would block everything else.
   `path_provider` (5 of 8 declared deps were dead)
 - Fix 11 deprecated `withOpacity` → `withValues`
 - Remove 4 `print()` calls, one of which logged every stored password
-- Fix `test/widget_test.dart` (references `MyApp`; the class is `DeutschMateApp`)
-- Create `assets/data/` + `assets/audio/` (declared in pubspec, never existed)
+- Fix `frontend/test/widget_test.dart` (references `MyApp`; the class is `DeutschMateApp`)
+- Create `frontend/assets/data/` + `frontend/assets/audio/` (declared in pubspec, never existed)
 - `git init` — this is not a repository yet, so "small reviewable commits" is
   currently impossible
 

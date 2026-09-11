@@ -19,6 +19,7 @@ prompt on the phone.
 Confirm the PC sees it:
 
 ```bash
+cd frontend
 flutter devices
 ```
 
@@ -52,6 +53,7 @@ The app defaults to `10.0.2.2`, which is emulator-only. A phone needs your
 actual LAN address:
 
 ```bash
+cd frontend
 flutter run --dart-define=API_BASE_URL=http://192.168.15.218:8000
 ```
 
@@ -108,7 +110,7 @@ Already in place:
 - `serverClientId` is the web client id, which is what makes Google mint an ID
   token rather than only an access token.
 - The backend accepts all three client ids as `aud`.
-- `android/app/src/debug/` permits cleartext HTTP to loopback addresses, so a
+- `frontend/android/app/src/debug/` permits cleartext HTTP to loopback addresses, so a
   debug build can talk to a local server. The release manifest does not.
 
 ## When it fails, in order of likelihood

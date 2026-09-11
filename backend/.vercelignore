@@ -1,0 +1,7 @@
+# Keep the function bundle to what actually serves requests.
+tests/
+pytest.ini
+requirements-dev.txt
+.env
+.env.*
+!.env.example

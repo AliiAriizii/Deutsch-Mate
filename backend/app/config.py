@@ -35,6 +35,10 @@ class Settings(BaseSettings):
 
     # --- App ---
     app_env: Literal["dev", "test", "prod"] = "dev"
+    # Vercel sets VERCEL=1 in every function environment. Empty everywhere
+    # else, which is how the app tells a long-lived process from a function
+    # instance without a second knob to keep in sync.
+    vercel: str = ""
     public_base_url: str = "http://127.0.0.1:8000"
     cors_origins: str = "http://localhost:*,http://127.0.0.1:*"
     email_verification_required: bool = True
@@ -67,6 +71,21 @@ class Settings(BaseSettings):
         if info.data.get("app_env") == "prod" and "CHANGE_ME" in v:
             raise ValueError("JWT_SECRET must be set to a real value when APP_ENV=prod")
         return v
+
+    @property
+    def is_serverless(self) -> bool:
+        return bool(self.vercel)
+
+    @property
+    def mongo_max_pool_size(self) -> int:
+        """Connections per instance.
+
+        Atlas caps total connections per cluster (500 on M0), and a serverless
+        deployment multiplies whatever this is by the number of live instances.
+        Fluid Compute serves several concurrent requests per instance, so 1
+        would serialise every database call; a small pool is the middle ground.
+        """
+        return 5 if self.is_serverless else 100
 
     @property
     def google_audience_list(self) -> list[str]:
