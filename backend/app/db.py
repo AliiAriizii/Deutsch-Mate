@@ -18,6 +18,7 @@ _ready = False
 # used on, so the loop they belong to is part of the cached state.
 _loop: asyncio.AbstractEventLoop | None = None
 _init_lock: asyncio.Lock | None = None
+_lock_loop: asyncio.AbstractEventLoop | None = None
 
 
 def document_models() -> list[type]:
@@ -75,14 +76,19 @@ async def ensure_db() -> None:
     raises rather than reconnecting. The lock keeps concurrent requests on a
     cold instance from each opening their own client.
     """
-    global _ready, _init_lock
+    global _ready, _init_lock, _lock_loop
 
     running = asyncio.get_running_loop()
     if _ready and _loop is running:
         return
 
-    if _init_lock is None or _loop is not running:
+    # Tracked against the lock's own loop, not the connection's: while the
+    # first caller is still inside connect() there is no connection loop yet,
+    # and keying on that would hand every waiting caller a fresh lock — which
+    # is no lock at all.
+    if _init_lock is None or _lock_loop is not running:
         _init_lock = asyncio.Lock()
+        _lock_loop = running
         _ready = False
 
     async with _init_lock:

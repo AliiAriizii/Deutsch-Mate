@@ -38,8 +38,27 @@ async def test_first_request_connects_without_a_lifespan() -> None:
 
 
 @pytest.mark.asyncio
-async def test_concurrent_cold_requests_connect_once() -> None:
+async def test_concurrent_cold_requests_connect_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ten requests hitting a cold instance must open one client between them.
+
+    Counted, not assumed: every extra client here is another connection held
+    against the Atlas per-cluster cap.
+    """
     await disconnect()
+
+    real_connect = db_module.connect
+    calls = 0
+
+    async def counting_connect(**kwargs):
+        nonlocal calls
+        calls += 1
+        # A real connect is slow enough to overlap; make that certain.
+        await asyncio.sleep(0)
+        return await real_connect(**kwargs)
+
+    monkeypatch.setattr(db_module, "connect", counting_connect)
 
     async with AsyncClient(
         transport=ASGITransport(app=create_app()), base_url="http://vercel"
@@ -50,6 +69,7 @@ async def test_concurrent_cold_requests_connect_once() -> None:
 
     assert {r.status_code for r in results} == {200}
     assert all(r.json()["ok"] for r in results)
+    assert calls == 1, f"connected {calls} times, expected once"
 
 
 def test_the_pool_shrinks_on_vercel() -> None:
