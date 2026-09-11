@@ -1,29 +1,27 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_data.dart';
+import '../../core/progress/lektion_plan.dart';
+import '../../core/progress/progress_models.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/lektion_spine.dart';
 import '../../widgets/primitives.dart';
+import '../../widgets/progress_scope.dart';
 import 'lesson_detail_screen.dart';
 
 /// The Lektion path.
 ///
-/// Replaces the flat list with the structure the course actually has: 12
-/// Lektionen in 4 Module of 3, threaded on the spine. A Lektion that opens a
-/// Modul gets a wider node and a Modul header, so the syllabus is readable
-/// without opening anything.
+/// Every state here now comes from real progress: what is finished, what is
+/// open, what is locked behind the Lektion before it. The card at the top says
+/// exactly which section to do next, so the answer to "how do I carry on" is
+/// never more than one tap away.
 class LearnScreen extends StatelessWidget {
   const LearnScreen({super.key});
 
-  /// Placeholder position until progress sync lands.
-  static const _completedCount = 4;
-
-  static const _lektionenPerModul = 3;
-
   @override
   Widget build(BuildContext context) {
-    final lessons = AppData.lessons;
+    final store = ProgressScope.of(context);
+    final plans = store.plans;
     final spacing = context.spacing;
 
     return Scaffold(
@@ -41,17 +39,17 @@ class LearnScreen extends StatelessWidget {
           spacing.gutter,
           spacing.xxxl,
         ),
-        itemCount: lessons.length,
-        itemBuilder: (context, index) {
-          final lesson = lessons[index];
-          final opensModul = index % _lektionenPerModul == 0;
-          final modulNumber = (index ~/ _lektionenPerModul) + 1;
+        // One extra row at the top for the "continue" card.
+        itemCount: plans.length + 1,
+        itemBuilder: (context, row) {
+          if (row == 0) return const _ContinueCard();
 
-          final state = switch (index) {
-            _ when index < _completedCount => SpineState.completed,
-            _completedCount => SpineState.current,
-            _ => SpineState.available,
-          };
+          final index = row - 1;
+          final plan = plans[index];
+          final status = store.statusFor(plan);
+          final opensModul = index % LektionPlan.lektionenPerModul == 0;
+          final modulNumber = (index ~/ LektionPlan.lektionenPerModul) + 1;
+          final progress = store.progressFor(plan);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,30 +65,31 @@ class LearnScreen extends StatelessWidget {
                     children: [
                       PlateLabel('Modul $modulNumber'),
                       SizedBox(width: spacing.sm),
-                      Expanded(
-                        child: Divider(color: context.colors.hairline),
-                      ),
+                      Expanded(child: Divider(color: context.colors.hairline)),
                     ],
                   ),
                 ),
               ],
               SpineRow(
                 spine: LektionSpine(
-                  state: state,
+                  state: switch (status) {
+                    LektionStatus.completed => SpineState.completed,
+                    LektionStatus.inProgress => SpineState.current,
+                    LektionStatus.available =>
+                      store.currentLektion?.lektionId == plan.lektionId
+                          ? SpineState.current
+                          : SpineState.available,
+                    LektionStatus.locked => SpineState.locked,
+                  },
                   isFirst: index == 0,
-                  isLast: index == lessons.length - 1,
+                  isLast: index == plans.length - 1,
                   opensModul: opensModul,
                   label: '${index + 1}',
                 ),
                 child: _LektionCard(
-                  lesson: lesson,
-                  state: state,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => LessonDetailScreen(lessonData: lesson),
-                    ),
-                  ),
+                  plan: plan,
+                  status: status,
+                  doneSections: progress.completedSectionCount,
                 ),
               ),
             ],
@@ -101,29 +100,122 @@ class LearnScreen extends StatelessWidget {
   }
 }
 
+/// The single most useful thing on this screen: what to do next, and a way
+/// straight into it.
+class _ContinueCard extends StatelessWidget {
+  const _ContinueCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final store = ProgressScope.of(context);
+    final spacing = context.spacing;
+    final next = store.nextStep;
+
+    if (next == null) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: spacing.xl),
+        child: AppCard(
+          borderColor: context.colors.success.withValues(alpha: 0.45),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PlateLabel('A1.1', color: context.colors.success),
+              SizedBox(height: spacing.xs),
+              Text('همه درس‌ها تمام شد', style: context.texts.titleMedium),
+              SizedBox(height: spacing.xs),
+              Text(
+                'می‌توانی در بخش تمرین مرور کنی تا سطح بعد اضافه شود.',
+                style: context.texts.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: spacing.xl),
+      child: AppCard(
+        borderColor: context.colors.accent,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LessonDetailScreen(plan: next.plan),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const PlateLabel('ادامه بده'),
+            SizedBox(height: spacing.xs),
+            Text(
+              '${next.plan.title} · ${next.section.persian}',
+              style: context.texts.titleMedium,
+            ),
+            SizedBox(height: spacing.xs),
+            Text(
+              next.plan.name,
+              style: context.texts.bodySmall,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.start,
+            ),
+            SizedBox(height: spacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${store.completedLektionen} از ${store.plans.length} درس',
+                    style: context.texts.labelSmall,
+                  ),
+                ),
+                Text(
+                  '${(store.courseFraction * 100).round()}%',
+                  style: AppTypography.monoStyle(
+                    color: context.colors.accentSoft,
+                    size: 13,
+                    weight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: spacing.sm),
+            AppProgressBar(value: store.courseFraction),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LektionCard extends StatelessWidget {
   const _LektionCard({
-    required this.lesson,
-    required this.state,
-    required this.onTap,
+    required this.plan,
+    required this.status,
+    required this.doneSections,
   });
 
-  final Map<String, dynamic> lesson;
-  final SpineState state;
-  final VoidCallback onTap;
+  final LektionPlan plan;
+  final LektionStatus status;
+  final int doneSections;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final spacing = context.spacing;
-    final isCurrent = state == SpineState.current;
-    final wordCount = (lesson['words'] as List?)?.length ?? 0;
+    final locked = status == LektionStatus.locked;
+    final store = ProgressScope.of(context);
+    final isCurrent = store.currentLektion?.lektionId == plan.lektionId;
 
     return AppCard(
-      onTap: onTap,
+      onTap: locked
+          ? null
+          : () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LessonDetailScreen(plan: plan),
+                ),
+              ),
       padding: EdgeInsets.all(spacing.lg),
-      // The current Lektion is the only card with a coloured edge, which is
-      // what makes "where am I" answerable at a glance.
       borderColor: isCurrent ? colors.accent : colors.hairline,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,47 +224,56 @@ class _LektionCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  lesson['name']?.toString() ?? '',
-                  style: context.texts.titleMedium,
+                  plan.name,
+                  style: context.texts.titleMedium?.copyWith(
+                    color: locked ? colors.textTertiary : colors.textPrimary,
+                  ),
                   textDirection: TextDirection.ltr,
                   textAlign: TextAlign.start,
                 ),
               ),
               Icon(
-                Icons.chevron_right,
+                locked ? Icons.lock_outline : Icons.chevron_right,
                 size: 18,
                 color: colors.textTertiary,
-                // Mirrors with the layout, so it always points "forward".
                 textDirection: Directionality.of(context),
               ),
             ],
           ),
           SizedBox(height: spacing.xs),
-          Text(
-            lesson['topic']?.toString() ?? '',
-            style: context.texts.bodySmall,
-          ),
+          Text(plan.topic, style: context.texts.bodySmall),
           SizedBox(height: spacing.md),
           Row(
             children: [
               Text(
-                '$wordCount واژه',
+                '$doneSections/${plan.stepCount} بخش',
                 style: AppTypography.monoStyle(
                   color: colors.textTertiary,
                   size: 11,
                 ),
               ),
               SizedBox(width: spacing.md),
-              if (state == SpineState.completed)
-                Text('تمام شد', style: context.texts.labelSmall)
-              else if (isCurrent)
-                Text(
-                  'ادامه بده',
+              Expanded(
+                child: Text(
+                  switch (status) {
+                    LektionStatus.completed => 'تمام شد',
+                    LektionStatus.inProgress => 'در جریان',
+                    LektionStatus.available => 'آماده شروع',
+                    LektionStatus.locked => 'درس قبلی را تمام کن',
+                  },
                   style: context.texts.labelSmall?.copyWith(
-                    color: colors.accentSoft,
-                    fontWeight: FontWeight.w600,
+                    color: switch (status) {
+                      LektionStatus.completed => colors.success,
+                      LektionStatus.inProgress ||
+                      LektionStatus.available =>
+                        colors.accentSoft,
+                      LektionStatus.locked => colors.textTertiary,
+                    },
+                    fontWeight:
+                        status == LektionStatus.locked ? null : FontWeight.w600,
                   ),
                 ),
+              ),
             ],
           ),
         ],

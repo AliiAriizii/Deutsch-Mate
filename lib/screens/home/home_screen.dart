@@ -1,29 +1,26 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_data.dart';
-import '../../core/german.dart';
+import '../../core/progress/progress_models.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/app_tokens.dart';
-import '../../widgets/gender_chip.dart';
 import '../../widgets/primitives.dart';
+import '../../widgets/progress_scope.dart';
+import '../learn/lesson_detail_screen.dart';
 
 /// Home.
 ///
-/// The figures here are still placeholders - real values arrive with progress
-/// sync. What changed is that they are laid out as a dense readout rather than
-/// a gamified dashboard, and the streak no longer shouts.
+/// Every figure on this screen is now computed from what the learner has
+/// actually done. It previously showed a hardcoded 4 completed Lektionen and a
+/// fixed 33%, which is why progress looked frozen no matter what you did.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final store = ProgressScope.of(context);
     final spacing = context.spacing;
-    final lessons = AppData.lessons;
-
-    // Placeholder position until progress is wired.
-    const completed = 4;
-    final total = lessons.length;
-    final ratio = completed / total;
+    final stats = store.stats;
+    final level = store.levelProgress;
 
     return Scaffold(
       appBar: AppBar(
@@ -53,12 +50,64 @@ class HomeScreen extends StatelessWidget {
           Text('Guten Tag', style: context.texts.displaySmall),
           SizedBox(height: spacing.xs),
           Text(
-            'ادامه از درس ${completed + 1} از $total',
+            stats.totalXp == 0
+                ? 'هنوز شروع نکرده‌ای. اولین بخش منتظر توست.'
+                : 'تا حالا ${stats.totalXp} XP جمع کرده‌ای.',
             style: context.texts.bodySmall,
           ),
           SizedBox(height: spacing.xl),
 
-          _CoursePanel(completed: completed, total: total, ratio: ratio),
+          const _NextStepCard(),
+          SizedBox(height: spacing.xl),
+
+          SectionHeader(title: 'امروز', eyebrow: 'هدف روزانه'),
+          const _TodayCard(),
+          SizedBox(height: spacing.xl),
+
+          SectionHeader(title: 'سطح', eyebrow: 'XP'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      'سطح ',
+                      style: context.texts.titleSmall,
+                    ),
+                    Text(
+                      '${level.level}',
+                      style: AppTypography.monoStyle(
+                        color: context.colors.accentSoft,
+                        size: 28,
+                        weight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    // The raw figures, not just a bar: a bar alone hides how
+                    // much is actually left.
+                    Text(
+                      '${level.into} / ${level.needed} XP',
+                      style: AppTypography.monoStyle(
+                        color: context.colors.textSecondary,
+                        size: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: spacing.md),
+                AppProgressBar(value: level.fraction),
+                SizedBox(height: spacing.sm),
+                Text(
+                  'برای سطح ${level.level + 1} به '
+                  '${(level.needed - level.into).clamp(0, 1 << 31)} XP دیگر نیاز داری',
+                  style: context.texts.labelSmall,
+                ),
+              ],
+            ),
+          ),
           SizedBox(height: spacing.xl),
 
           SectionHeader(title: 'یک نگاه', eyebrow: 'وضعیت'),
@@ -66,7 +115,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: StatTile(
-                  value: '$completed',
+                  value: '${store.completedLektionen}',
                   label: 'درس تمام‌شده',
                   tint: context.colors.accentSoft,
                 ),
@@ -74,8 +123,11 @@ class HomeScreen extends StatelessWidget {
               SizedBox(width: spacing.md),
               Expanded(
                 child: StatTile(
-                  value: '${_articleCount(lessons)}',
-                  label: 'اسم با آرتیکل',
+                  value: '${stats.currentStreak}',
+                  label: 'روز پیاپی',
+                  tint: stats.currentStreak > 0
+                      ? context.colors.warning
+                      : null,
                 ),
               ),
             ],
@@ -85,125 +137,162 @@ class HomeScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: StatTile(
-                  value: '${_wordCount(lessons)}',
-                  label: 'واژه در این سطح',
+                  value: '${stats.totalXp}',
+                  label: 'مجموع XP',
                 ),
               ),
               SizedBox(width: spacing.md),
               Expanded(
                 child: StatTile(
-                  value: '${_sentenceCount(lessons)}',
-                  label: 'جمله نمونه',
+                  value: '${stats.longestStreak}',
+                  label: 'بلندترین رکورد',
                 ),
               ),
             ],
-          ),
-          SizedBox(height: spacing.xl),
-
-          SectionHeader(title: 'جنسیت اسم‌ها', eyebrow: 'راهنمای رنگ'),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'رنگ هر آرتیکل در تمام برنامه یکسان است. '
-                  'با نگاه‌کردن به رنگ می‌توانی جنسیت اسم را تشخیص بدهی.',
-                  style: context.texts.bodySmall,
-                ),
-                SizedBox(height: spacing.md),
-                const GenderLegend(),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
-
-  static int _wordCount(List<Map<String, dynamic>> lessons) => lessons.fold(
-        0,
-        (sum, l) => sum + ((l['words'] as List?)?.length ?? 0),
-      );
-
-  static int _sentenceCount(List<Map<String, dynamic>> lessons) => lessons.fold(
-        0,
-        (sum, l) => sum + ((l['sentences'] as List?)?.length ?? 0),
-      );
-
-  static int _articleCount(List<Map<String, dynamic>> lessons) {
-    final entries = lessons
-        .expand((l) => (l['words'] as List? ?? const []))
-        .map((w) => (w['word'] ?? '').toString());
-    return nounsWithArticles(entries).length;
-  }
 }
 
-/// The course panel. One saturated element in this view - the progress fill -
-/// and everything else steps down to the soft blue or plain text.
-class _CoursePanel extends StatelessWidget {
-  const _CoursePanel({
-    required this.completed,
-    required this.total,
-    required this.ratio,
-  });
-
-  final int completed;
-  final int total;
-  final double ratio;
+/// What to do next, with a way straight into it.
+class _NextStepCard extends StatelessWidget {
+  const _NextStepCard();
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final store = ProgressScope.of(context);
     final spacing = context.spacing;
+    final next = store.nextStep;
+
+    if (next == null) {
+      return AppCard(
+        borderColor: context.colors.success.withValues(alpha: 0.45),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PlateLabel('A1.1', color: context.colors.success),
+            SizedBox(height: spacing.xs),
+            Text('سطح A1.1 تمام شد', style: context.texts.titleMedium),
+            SizedBox(height: spacing.xs),
+            Text(
+              'در بخش تمرین مرور کن تا سطح بعد اضافه شود.',
+              style: context.texts.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
 
     return AppCard(
-      padding: EdgeInsets.all(spacing.lg),
+      borderColor: context.colors.accent,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LessonDetailScreen(plan: next.plan),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const PlateLabel('Menschen · Kursbuch'),
-                    SizedBox(height: spacing.xs),
-                    Text('A1.1', style: context.texts.displaySmall),
-                  ],
-                ),
-              ),
-              // Percentage in mono so the glyphs do not shift as it changes.
-              Text(
-                '${(ratio * 100).round()}%',
-                style: AppTypography.monoStyle(
-                  color: colors.accentSoft,
-                  size: 20,
-                  weight: FontWeight.w600,
-                ),
-              ),
-            ],
+          const PlateLabel('قدم بعدی'),
+          SizedBox(height: spacing.xs),
+          Text(
+            '${next.plan.title} · ${next.section.persian}',
+            style: context.texts.titleMedium,
           ),
-          SizedBox(height: spacing.lg),
-          AppProgressBar(value: ratio),
+          SizedBox(height: spacing.xs),
+          Text(
+            next.plan.name,
+            style: context.texts.bodySmall,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.start,
+          ),
           SizedBox(height: spacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '4 مدول · 12 درس',
+          AppProgressBar(value: store.courseFraction),
+          SizedBox(height: spacing.sm),
+          Text(
+            '${store.completedLektionen} از ${store.plans.length} درس · '
+            '${(store.courseFraction * 100).round()}%',
+            style: context.texts.labelSmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Today's goal as a ring plus the numbers behind it.
+class _TodayCard extends StatelessWidget {
+  const _TodayCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final store = ProgressScope.of(context);
+    final colors = context.colors;
+    final spacing = context.spacing;
+    final met = store.dailyGoalMet;
+    final tint = met ? colors.success : colors.accent;
+
+    return AppCard(
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox.expand(
+                  child: CircularProgressIndicator(
+                    value: store.todayFraction,
+                    strokeWidth: 5,
+                    backgroundColor: colors.inputFill,
+                    valueColor: AlwaysStoppedAnimation(tint),
+                  ),
+                ),
+                if (met)
+                  Icon(Icons.check, size: 22, color: colors.success)
+                else
+                  Text(
+                    '${(store.todayFraction * 100).round()}',
+                    style: AppTypography.monoStyle(
+                      color: colors.textSecondary,
+                      size: 13,
+                      weight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(width: spacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  met ? 'هدف امروز انجام شد' : 'هدف امروز',
+                  style: context.texts.titleSmall?.copyWith(
+                    color: met ? colors.success : colors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: spacing.xxs),
+                Text(
+                  '${store.stats.xpToday} از ${store.dailyGoalXp} XP',
+                  style: context.texts.bodySmall,
+                ),
+                SizedBox(height: spacing.xxs),
+                Text(
+                  // Says plainly what keeps a streak alive, instead of only
+                  // warning once it is about to break.
+                  met
+                      ? 'رکوردت حفظ شد'
+                      : 'با رسیدن به هدف، روز پیاپی ثبت می‌شود',
                   style: context.texts.labelSmall,
                 ),
-              ),
-              Text(
-                '$completed از $total',
-                style: AppTypography.monoStyle(
-                  color: colors.textSecondary,
-                  size: 13,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

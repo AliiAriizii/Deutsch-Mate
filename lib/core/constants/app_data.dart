@@ -2,7 +2,7 @@ class AppData {
   static final List<Map<String, dynamic>> lessons = [
     {
       "title": "Lektion 1",
-      "name": "Hallo! Ich bin Nicole",
+      "name": "Guten Tag! Wie heißt du?",
       "topic": "سلام، معرفی، کشور و زبان",
       "grammar": "ich / du / Sie + sein, heißen, kommen, wohnen, sprechen, lernen",
       "words": [
@@ -60,7 +60,7 @@ class AppData {
     },
     {
       "title": "Lektion 2",
-      "name": "Ich bin Journalistin",
+      "name": "Was machst du beruflich?",
       "topic": "اطلاعات شخصی، سن، شغل و کار",
       "grammar": "صرف فعل در زمان حال + sein / haben + اطلاعات شخصی",
       "words": [
@@ -115,7 +115,7 @@ class AppData {
     },
     {
       "title": "Lektion 3",
-      "name": "Das ist meine Mutter",
+      "name": "Meine Familie und ich",
       "topic": "خانواده و اعضای خانواده",
       "grammar": "mein / meine + dein / deine + haben",
       "words": [
@@ -160,7 +160,7 @@ class AppData {
     },
     {
       "title": "Lektion 4",
-      "name": "Der Tisch ist schön!",
+      "name": "Der Stuhl kostet zehn Euro",
       "topic": "وسایل خانه، خرید و توصیف اشیا",
       "grammar": "der / die / das + sein + صفت + پرسیدن قیمت",
       "words": [
@@ -207,7 +207,7 @@ class AppData {
     },
     {
       "title": "Lektion 5",
-      "name": "Was ist das?",
+      "name": "Wie heißt das auf Deutsch?",
       "topic": "اشیای روزمره و پرسیدن نام وسایل",
       "grammar": "ein / eine + kein / keine + Akkusativ مقدماتی",
       "words": [
@@ -248,7 +248,7 @@ class AppData {
     },
     {
       "title": "Lektion 6",
-      "name": "Ich brauche kein Büro",
+      "name": "Mein Arbeitsplatz",
       "topic": "محل کار و تکنولوژی",
       "grammar": "Akkusativ مقدماتی + kein / keine / keinen + haben / brauchen",
       "words": [
@@ -286,7 +286,7 @@ class AppData {
     },
     {
       "title": "Lektion 7",
-      "name": "Du kannst wirklich toll!",
+      "name": "Ich kann gut kochen",
       "topic": "اوقات فراغت، سرگرمی و توانایی",
       "grammar": "können + مصدر در انتهای جمله",
       "words": [
@@ -327,7 +327,7 @@ class AppData {
     },
     {
       "title": "Lektion 8",
-      "name": "Kein Problem. Ich habe Zeit!",
+      "name": "Treffen wir uns am Samstag?",
       "topic": "وقت آزاد، روزهای هفته، قرار و برنامه‌ریزی",
       "grammar": "روزهای هفته + am + ساعت با um + haben / treffen",
       "words": [
@@ -368,7 +368,7 @@ class AppData {
     },
     {
       "title": "Lektion 9",
-      "name": "Ich möchte was essen, Onkel Harry",
+      "name": "Ich möchte einen Kaffee, bitte",
       "topic": "غذا، نوشیدنی و سفارش دادن",
       "grammar": "möchten + Akkusativ مقدماتی + essen / trinken",
       "words": [
@@ -413,7 +413,7 @@ class AppData {
     },
     {
       "title": "Lektion 10",
-      "name": "Ich steige jetzt in die U-Bahn ein",
+      "name": "Wie komme ich zum Bahnhof?",
       "topic": "حمل‌ونقل، سفر و مسیر",
       "grammar": "افعال جداشدنی مثل einsteigen / aussteigen + fahren",
       "words": [
@@ -452,7 +452,7 @@ class AppData {
     },
     {
       "title": "Lektion 11",
-      "name": "Was hast du heute gemacht?",
+      "name": "Gestern war viel los",
       "topic": "کارهای روزمره و صحبت درباره گذشته",
       "grammar": "Perfekt با haben / sein + Partizip II",
       "words": [
@@ -487,7 +487,7 @@ class AppData {
     },
     {
       "title": "Lektion 12",
-      "name": "Was ist denn hier passiert?",
+      "name": "Wir haben den Zug verpasst",
       "topic": "اتفاقات گذشته، مشکلات و توضیح اتفاق",
       "grammar": "مرور Perfekt + تفاوت haben / sein + Partizip II",
       "words": [

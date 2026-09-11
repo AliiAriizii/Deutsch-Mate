@@ -20,11 +20,18 @@ void main() {
   test('no hardcoded colours outside lib/theme', () {
     final offenders = <String>[];
 
+    // A line may opt out with `// theme-exempt: <reason>`. The only legitimate
+    // case so far is a third-party brand mark, whose colours are not ours to
+    // restyle. Requiring the marker inline means an exemption is a visible,
+    // reviewable decision rather than a silent drift.
+    final exempt = RegExp(r'//\s*theme-exempt:');
+
     for (final file in widgetFiles()) {
       final lines = file.readAsLinesSync();
       for (var i = 0; i < lines.length; i++) {
         final line = lines[i];
         if (line.trimLeft().startsWith('//')) continue;
+        if (exempt.hasMatch(line)) continue;
 
         if (line.contains('Color(0x')) {
           offenders.add('${file.path}:${i + 1}  $line');

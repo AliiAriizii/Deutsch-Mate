@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_typography.dart';
 import '../theme/app_tokens.dart';
+import 'primitives.dart';
 
 /// How an answer choice is currently rendered.
 enum ChoiceState { idle, selectedCorrect, selectedWrong, revealedCorrect }
@@ -120,20 +121,12 @@ class FeedbackBanner extends StatelessWidget {
       FeedbackKind.wrong => colors.error,
     };
 
-    return Container(
+    // A single leading bar rather than a full border: quieter, and it mirrors
+    // correctly under RTL. AccentEdgeBox rather than a non-uniform border,
+    // which would assert at paint time against the corner radius.
+    return AccentEdgeBox(
+      tint: tint,
       padding: EdgeInsets.all(context.spacing.lg),
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.10),
-        borderRadius: context.radii.controlBorder,
-        // A single leading bar rather than a full border: quieter, and it
-        // mirrors correctly under RTL.
-        border: BorderDirectional(
-          start: BorderSide(color: tint, width: 3),
-          top: BorderSide(color: tint.withValues(alpha: 0.3)),
-          bottom: BorderSide(color: tint.withValues(alpha: 0.3)),
-          end: BorderSide(color: tint.withValues(alpha: 0.3)),
-        ),
-      ),
       child: Row(
         children: [
           Expanded(

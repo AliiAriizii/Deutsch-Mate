@@ -7,4 +7,9 @@ pydantic-settings==2.15.0
 email-validator==2.3.0
 argon2-cffi==25.1.0
 PyJWT==2.13.0
+# RS256 verification of Google/Apple ID tokens. PyJWT delegates asymmetric
+# crypto to this; without it jwt.decode raises on RS256.
+cryptography==46.0.4
+# Fetching Google's JWKS. Production code path, not test-only.
+httpx==0.28.1
 python-multipart==0.0.32

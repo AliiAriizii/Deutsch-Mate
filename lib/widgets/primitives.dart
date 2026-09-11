@@ -221,3 +221,75 @@ class EmptyState extends StatelessWidget {
     );
   }
 }
+
+/// A panel with an accent bar on its leading edge and rounded corners.
+///
+/// Exists because the obvious way to build this crashes. A `BoxDecoration`
+/// whose border has non-uniform colours - a thick coloured start side, faint
+/// sides - asserts at *paint* time when combined with a `borderRadius`:
+///
+///     'A borderRadius can only be given for borders with uniform colors.'
+///
+/// The widget still lays out, so the box appears but its contents never draw:
+/// an empty coloured rectangle where the message should be. It is a paint-time
+/// failure, so it survives any test that does not actually rasterise the
+/// widget - which is how it reached a user here.
+///
+/// The fix is structural: a uniform border carries the radius, and the accent
+/// bar is a child clipped to the same radius. Being a `Row` child, it mirrors
+/// under RTL for free.
+class AccentEdgeBox extends StatelessWidget {
+  const AccentEdgeBox({
+    super.key,
+    required this.tint,
+    required this.child,
+    this.fillAlpha = 0.10,
+    this.borderAlpha = 0.3,
+    this.barWidth = 3,
+    this.padding,
+    this.background,
+  });
+
+  final Color tint;
+  final Widget child;
+  final double fillAlpha;
+  final double borderAlpha;
+  final double barWidth;
+  final EdgeInsetsGeometry? padding;
+
+  /// Overrides the tinted fill, for panels that sit on a card colour instead.
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = context.radii.controlBorder;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background ?? tint.withValues(alpha: fillAlpha),
+        borderRadius: radius,
+        // Uniform, which is what makes the radius legal.
+        border: Border.all(color: tint.withValues(alpha: borderAlpha)),
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: barWidth,
+                child: ColoredBox(color: tint),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: padding ?? EdgeInsets.all(context.spacing.md),
+                  child: child,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
